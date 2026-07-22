@@ -1,0 +1,37 @@
+{
+  "name": "code-understanding-pro",
+  "version": "1.2.0-ja",
+  "language": "ja",
+  "description": "既存コードの段階的理解、レビュー、QA、ドキュメント化、リファクタリング支援を行う日本語Skill。",
+  "entrypoint": "SKILL.md",
+  "modes": [
+    "Quick",
+    "Full",
+    "Review",
+    "Documentation",
+    "Refactoring"
+  ],
+  "created_for": "Yamaguchi Manabu",
+  "generated_date": "2026-07-07",
+  "files": [
+    "LICENSE.txt",
+    "README.md",
+    "SKILL.md",
+    "VERSION",
+    "assets/docstring-template-python.md",
+    "assets/docstring-template-r.md",
+    "assets/mermaid-patterns.md",
+    "assets/output-template-full.md",
+    "assets/output-template-quick.md",
+    "assets/output-template-refactoring.md",
+    "assets/output-template-review.md",
+    "examples/example-prompts.md",
+    "examples/expected-output-skeleton.md",
+    "manifest.json",
+    "references/qiita-code-reading-pyramid.md",
+    "references/refactoring-safety-checklist.md",
+    "references/review-severity-guide.md",
+    "references/test-first-caveats.md",
+    "scripts/collect_code_context.py"
+  ]
+}
