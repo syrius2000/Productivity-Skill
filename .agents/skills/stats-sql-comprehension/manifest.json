@@ -1,0 +1,16 @@
+{
+  "name": "stats-sql-comprehension",
+  "version": "1.0.0",
+  "language": "ja",
+  "description": "分析用SQL（dbt, BigQuery）や統計解析コード（R, Python）を5段階ピラミッドで解読・可視化・評価するスキル。",
+  "entrypoint": "SKILL.md",
+  "files": [
+    "SKILL.md",
+    "manifest.json",
+    "assets/output-template-sql.md",
+    "assets/output-template-stats.md",
+    "assets/mermaid-dataflow-patterns.md",
+    "references/sql-performance-cheatsheet.md",
+    "references/stats-validation-checklist.md"
+  ]
+}

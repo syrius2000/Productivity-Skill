@@ -20,9 +20,18 @@ npx skills add <your-github-username>/Productivity-Skill -g
 
 ---
 
-## 🛠️ 収録スキル一覧 (12 Skills)
+## 🛠️ 収録スキル一覧 (13 Skills)
 
-### 1. 🔍 コード理解・レビュー・リファクタリング
+### 1. 📊 統計解析＆SQL高度解読
+
+#### 📈 **`stats-sql-comprehension`**
+- **概要**: 複雑な分析用SQL（dbt, BigQuery, CTE, ウィンドウ関数）や統計解析コード（R, Python）を5段階ピラミッドで解読・可視化・評価するスキル。
+- **特徴**: CTEや結合構造のMermaidリネージ図作成、フルスキャンや多対多結合による行数膨張リスクの検出、統計的バイアス（選択・生存者バイアス等）の検証を行います。
+- **起動条件**: 「このSQLを説明して」「クエリを解読して」「dbtモデルを解説して」「データフローを可視化して」「統計コードをレビューして」「SQLのパフォーマンスを評価して」
+
+---
+
+### 2. 🔍 コード理解・レビュー・リファクタリング
 
 #### 📖 **`code-understanding-pro`**
 - **概要**: 既存コードの段階的理解、詳細解析、コードレビュー、ドキュメント化、安全なリファクタリング支援を包括的に行う日本語スキル。
@@ -113,6 +122,7 @@ npx skills add <your-github-username>/Productivity-Skill -g
 │       ├── grill-with-docs/
 │       ├── grilling/
 │       ├── improve-codebase-architecture/
+│       ├── stats-sql-comprehension/
 │       ├── teach/
 │       ├── to-spec/
 │       ├── to-tickets/
