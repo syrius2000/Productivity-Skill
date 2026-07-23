@@ -12,10 +12,10 @@ AI コーディングエージェント（Antigravity, Cursor, Claude Code, Code
 ### インストール方法
 ```bash
 # プロジェクトへの導入
-npx skills add <your-github-username>/Productivity-Skill
+npx skills add syrius2000/Productivity-Skill
 
 # グローバル導入
-npx skills add <your-github-username>/Productivity-Skill -g
+npx skills add syrius2000/Productivity-Skill -g
 ```
 
 ---
@@ -45,7 +45,7 @@ npx skills add <your-github-username>/Productivity-Skill -g
 
 ---
 
-### 2. 🌶️ 思考整理・設計のストレステスト (Grilling)
+### 3. 🌶️ 思考整理・設計のストレステスト (Grilling)
 
 #### 🔥 **`grilling`**
 - **概要**: プラン、意思決定、設計アイデアに対してAIが多角的に「徹底的な1問1答インタビュー」を行う思考検証スキル。
@@ -62,7 +62,7 @@ npx skills add <your-github-username>/Productivity-Skill -g
 
 ---
 
-### 3. 🐛 デバッグ・品質向上
+### 4. 🐛 デバッグ・品質向上
 
 #### 🕵️ **`diagnosing-bugs`**
 - **概要**: 勘や対症療法に頼らず、再現ループの構築と仮説検証によって根本原因を特定・解消する構造的デバッグスキル。
@@ -71,7 +71,7 @@ npx skills add <your-github-username>/Productivity-Skill -g
 
 ---
 
-### 4. 📝 ドキュメント・タスク自動生成
+### 5. 📝 ドキュメント・タスク自動生成
 
 #### 📄 **`to-spec`**
 - **概要**: チャット上のこれまでの会話文脈とコードベースの理解から、再ヒアリングなしで完全な「仕様書（Spec / PRD）」を自動合成するスキル。
@@ -84,7 +84,7 @@ npx skills add <your-github-username>/Productivity-Skill -g
 
 ---
 
-### 5. 🏗️ アーキテクチャ改善・ドメインモデル管理
+### 6. 🏗️ アーキテクチャ改善・ドメインモデル管理
 
 #### 📐 **`improve-codebase-architecture`**
 - **概要**: コードベース全体の結合度・複雑性・テスト容易性を診断し、安全かつ段階的なリファクタリング計画を立案するスキル。
@@ -96,7 +96,7 @@ npx skills add <your-github-username>/Productivity-Skill -g
 
 ---
 
-### 6. 📚 学習・スキル開発
+### 7. 📚 学習・スキル開発
 
 #### 👨‍🏫 **`teach`**
 - **概要**: 一方的な解説ではなく、対話形式で段階的に複雑な技術・アルゴリズム・コードの仕組みを教えてくれる教育スキル。
@@ -135,4 +135,7 @@ npx skills add <your-github-username>/Productivity-Skill -g
 
 ## 📜 ライセンス
 
-各スキルはそれぞれのライセンスおよび Agent Skills 仕様に準拠します。
+本リポジトリ全体のライセンスは定義していません。各スキルに同梱された
+`SKILL.md`、`LICENSE`、`LICENSE.txt` 等の記載を確認してください。
+たとえば、`code-understanding-pro` は `Internal Use License`、
+`stats-sql-comprehension` は `MIT` と定義されています。

@@ -11,3 +11,10 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Python generated files
+__pycache__/
+*.py[cod]
+
+# Local agent execution state
+.superpowers/
