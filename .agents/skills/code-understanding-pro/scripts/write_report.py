@@ -4,12 +4,16 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
+import errno
 import hashlib
 import json
+import os
+import platform
 import re
 import shutil
+import secrets
 import sys
-import tempfile
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -42,7 +46,13 @@ def redact_secrets(text: str) -> str:
         return f"{match.group('prefix')}{match.group('quote')}[REDACTED]{match.group('quote')}"
 
     text = re.sub(
-        rf"(?P<prefix>{assignment_prefix})(?P<quote>[\"'])(?P<value>.*?)(?P=quote)",
+        rf'(?P<prefix>{assignment_prefix})(?P<quote>")(?P<value>(?:\\.|[^"\\\r\n])*)(?P=quote)',
+        replace_quoted,
+        text,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+    text = re.sub(
+        rf"(?P<prefix>{assignment_prefix})(?P<quote>')(?P<value>(?:\\.|''|[^'\\\r\n])*)(?P=quote)",
         replace_quoted,
         text,
         flags=re.IGNORECASE | re.MULTILINE,
@@ -109,6 +119,96 @@ def run_directory(output_root: Path, target: str, run_id: str) -> Path:
     return run_dir
 
 
+def directory_open_flags() -> int:
+    """symlinkを辿らずディレクトリfdを開くためのフラグを返す。"""
+    directory = getattr(os, "O_DIRECTORY", None)
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if directory is None or nofollow is None:
+        raise OSError(errno.ENOTSUP, "安全なrun出力に必要なdirectory fd機能を利用できません")
+    return os.O_RDONLY | directory | nofollow
+
+
+def create_staging_directory(parent_fd: int, run_name: str) -> str:
+    """固定済みの親fd配下に、衝突しないstagingディレクトリを作成する。"""
+    for _ in range(100):
+        staging_name = f".{run_name}.tmp-{secrets.token_hex(16)}"
+        try:
+            os.mkdir(staging_name, mode=0o700, dir_fd=parent_fd)
+        except FileExistsError:
+            continue
+        return staging_name
+    raise FileExistsError("stagingディレクトリ名を安全に確保できません")
+
+
+def write_file_at(directory_fd: int, filename: str, text: str) -> None:
+    """固定済みのディレクトリfd配下へ新規ファイルを安全に書き込む。"""
+    fd = os.open(
+        filename,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+        0o600,
+        dir_fd=directory_fd,
+    )
+    try:
+        data = text.encode("utf-8")
+        offset = 0
+        while offset < len(data):
+            written = os.write(fd, data[offset:])
+            if written <= 0:
+                raise OSError(errno.EIO, f"成果物を書き込めません: {filename}")
+            offset += written
+    finally:
+        os.close(fd)
+
+
+def cleanup_staging_directory(parent_fd: int, staging_name: str) -> None:
+    """固定済みの親fd配下から失敗したstagingを除去する。"""
+    try:
+        shutil.rmtree(staging_name, dir_fd=parent_fd)
+    except FileNotFoundError:
+        pass
+
+
+def entry_exists(parent_fd: int, name: str) -> bool:
+    try:
+        os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return False
+    return True
+
+
+def publish_staging(parent_fd: int, staging_name: str, final_name: str) -> None:
+    """no-replace primitiveだけを使ってstagingを最終run名へ公開する。"""
+    system = platform.system()
+    source = os.fsencode(staging_name)
+    destination = os.fsencode(final_name)
+    libc = ctypes.CDLL(None, use_errno=True)
+
+    if system == "Darwin":
+        operation = libc.renameatx_np
+        operation.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint)
+        operation.restype = ctypes.c_int
+        ctypes.set_errno(0)
+        result = operation(parent_fd, source, parent_fd, destination, 0x00000004 | 0x00000010)
+    elif system == "Linux":
+        syscall_numbers = {"x86_64": 316, "aarch64": 276, "arm64": 276}
+        syscall_number = syscall_numbers.get(platform.machine().lower())
+        if syscall_number is None:
+            raise OSError(errno.ENOTSUP, "安全なno-replace renameを利用できません")
+        operation = libc.syscall
+        operation.restype = ctypes.c_long
+        ctypes.set_errno(0)
+        result = operation(syscall_number, parent_fd, source, parent_fd, destination, 1)
+    else:
+        raise OSError(errno.ENOTSUP, "安全なno-replace renameを利用できません")
+
+    if result == 0:
+        return
+    error_number = ctypes.get_errno()
+    if error_number == errno.EEXIST:
+        raise FileExistsError(f"出力先が既に存在します（上書きしません）: {final_name}")
+    raise OSError(error_number or errno.EIO, "安全なno-replace renameで成果物を公開できません")
+
+
 def skill_version() -> str:
     version_file = SKILL_DIR / "VERSION"
     try:
@@ -160,42 +260,50 @@ def write_markdown_report(
     target_dir = run_dir.parent
     target_dir.mkdir(parents=True, exist_ok=True)
     ensure_output_containment(output_root, target_dir, run_dir)
-    if run_dir.exists():
-        raise FileExistsError(f"出力先が既に存在します（上書きしません）: {run_dir}")
-
-    staging_dir = Path(tempfile.mkdtemp(prefix=f".{run_dir.name}.tmp-", dir=target_dir))
+    parent_fd = os.open(target_dir, directory_open_flags())
     try:
-        report_file = REPORT_FILENAMES[mode_key]
-        (staging_dir / report_file).write_text(redact_secrets(content), encoding="utf-8")
-        metadata = {
-            "interface_version": INTERFACE_VERSION,
-            "skill": "code-understanding-pro",
-            "skill_version": skill_version(),
-            "mode": DISPLAY_MODES[mode_key],
-            "adapter": adapter,
-            "audience": audience,
-            "target": target,
-            "report_file": report_file,
-            "generated_at": datetime.now(ZoneInfo("Asia/Tokyo")).isoformat(),
-        }
-        (staging_dir / "run_meta.json").write_text(
-            json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
-        source_manifest = {
-            "interface_version": INTERFACE_VERSION,
-            "sources": [source_entry(source) for source in sources or []],
-        }
-        (staging_dir / "source_manifest.json").write_text(
-            json.dumps(source_manifest, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
-        if run_dir.exists():
+        if entry_exists(parent_fd, run_dir.name):
             raise FileExistsError(f"出力先が既に存在します（上書きしません）: {run_dir}")
-        staging_dir.rename(run_dir)
-    except BaseException:
-        shutil.rmtree(staging_dir, ignore_errors=True)
-        raise
+
+        staging_name = create_staging_directory(parent_fd, run_dir.name)
+        report_file = REPORT_FILENAMES[mode_key]
+        try:
+            staging_fd = os.open(staging_name, directory_open_flags(), dir_fd=parent_fd)
+            try:
+                write_file_at(staging_fd, report_file, redact_secrets(content))
+                metadata = {
+                    "interface_version": INTERFACE_VERSION,
+                    "skill": "code-understanding-pro",
+                    "skill_version": skill_version(),
+                    "mode": DISPLAY_MODES[mode_key],
+                    "adapter": adapter,
+                    "audience": audience,
+                    "target": target,
+                    "report_file": report_file,
+                    "generated_at": datetime.now(ZoneInfo("Asia/Tokyo")).isoformat(),
+                }
+                write_file_at(
+                    staging_fd,
+                    "run_meta.json",
+                    json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
+                )
+                source_manifest = {
+                    "interface_version": INTERFACE_VERSION,
+                    "sources": [source_entry(source) for source in sources or []],
+                }
+                write_file_at(
+                    staging_fd,
+                    "source_manifest.json",
+                    json.dumps(source_manifest, ensure_ascii=False, indent=2) + "\n",
+                )
+            finally:
+                os.close(staging_fd)
+            publish_staging(parent_fd, staging_name, run_dir.name)
+        except BaseException:
+            cleanup_staging_directory(parent_fd, staging_name)
+            raise
+    finally:
+        os.close(parent_fd)
     return run_dir / report_file
 
 

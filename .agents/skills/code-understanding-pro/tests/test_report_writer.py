@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import importlib.util
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -171,6 +172,47 @@ export TOKEN="environment-token"
     assert saved.count("[REDACTED]") >= len(secret_values)
 
 
+def test_write_report_redacts_escaped_quoted_secret_values_without_breaking_syntax(tmp_path: Path) -> None:
+    content_path = tmp_path / "content.md"
+    json_line = r'{"api_key":"first\"second\\path"}'
+    content_path.write_text(
+        "\n".join(
+            (
+                json_line,
+                r"secret: 'yaml ''single quote'' \\path'",
+                r'export TOKEN="env\"quote\\path"',
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = run_cli(
+        WRITER,
+        "--mode",
+        "documentation",
+        "--target",
+        "src/source.py",
+        "--content-file",
+        str(content_path),
+        "--output-root",
+        str(tmp_path / "out"),
+        "--run-id",
+        "escaped-secrets",
+    )
+
+    assert result.returncode == 0, result.stderr
+    saved_lines = (
+        tmp_path / "out" / "source" / "run_escaped-secrets" / "report.md"
+    ).read_text(encoding="utf-8").splitlines()
+    assert json.loads(saved_lines[0]) == {"api_key": "[REDACTED]"}
+    assert saved_lines[1] == "secret: '[REDACTED]'"
+    assert saved_lines[2] == 'export TOKEN="[REDACTED]"'
+    saved = "\n".join(saved_lines)
+    for fragment in ("first", "second", "path", "yaml", "single", "quote", "env"):
+        assert fragment not in saved
+
+
 def test_write_report_rejects_unsafe_run_ids(tmp_path: Path) -> None:
     content_path = tmp_path / "content.md"
     content_path.write_text("# report\n", encoding="utf-8")
@@ -225,17 +267,17 @@ def test_write_report_rejects_resolved_output_outside_target_directory(tmp_path:
 def test_write_report_cleans_staging_directory_after_failure_and_allows_retry(tmp_path: Path) -> None:
     writer = load_writer_module()
     output_root = tmp_path / "out"
-    original_write_text = Path.write_text
+    original_os_write = os.write
 
-    def fail_metadata_write(path: Path, *args: object, **kwargs: object) -> int:
-        if path.name == "run_meta.json":
+    def fail_metadata_write(fd: int, data: bytes) -> int:
+        if b'"skill": "code-understanding-pro"' in data:
             raise OSError("metadata write failed")
-        return original_write_text(path, *args, **kwargs)
+        return original_os_write(fd, data)
 
     from pytest import MonkeyPatch
 
     failing_patch = MonkeyPatch()
-    failing_patch.setattr(Path, "write_text", fail_metadata_write)
+    failing_patch.setattr(os, "write", fail_metadata_write)
     try:
         try:
             writer.write_markdown_report(
@@ -265,6 +307,97 @@ def test_write_report_cleans_staging_directory_after_failure_and_allows_retry(tm
     )
     assert report_path == run_dir / "report.md"
     assert report_path.read_text(encoding="utf-8") == "# report\n"
+
+
+def test_write_report_preserves_competing_run_and_cleans_staging_directory(tmp_path: Path) -> None:
+    writer = load_writer_module()
+    assert callable(getattr(writer, "publish_staging", None))
+    output_root = tmp_path / "out"
+    target_dir = output_root / "source"
+    target_dir.mkdir(parents=True)
+    real_publish = writer.publish_staging
+
+    def publish_after_competitor(parent_fd: int, staging_name: str, final_name: str) -> None:
+        os.mkdir(final_name, dir_fd=parent_fd)
+        final_fd = os.open(
+            final_name,
+            os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+            dir_fd=parent_fd,
+        )
+        try:
+            report_fd = os.open(
+                "report.md",
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                0o600,
+                dir_fd=final_fd,
+            )
+            try:
+                os.write(report_fd, b"incumbent\n")
+            finally:
+                os.close(report_fd)
+        finally:
+            os.close(final_fd)
+        real_publish(parent_fd, staging_name, final_name)
+
+    from pytest import MonkeyPatch
+
+    collision_patch = MonkeyPatch()
+    collision_patch.setattr(writer, "publish_staging", publish_after_competitor)
+    try:
+        try:
+            writer.write_markdown_report(
+                "# candidate\n",
+                mode="full",
+                target="src/source.py",
+                output_root=output_root,
+                run_id="collision",
+            )
+        except FileExistsError:
+            pass
+        else:
+            raise AssertionError("競合runがある場合はpublishに失敗しなければなりません")
+    finally:
+        collision_patch.undo()
+
+    run_dir = target_dir / "run_collision"
+    assert (run_dir / "report.md").read_text(encoding="utf-8") == "incumbent\n"
+    assert not list(target_dir.glob(".run_collision.tmp-*"))
+
+
+def test_write_report_keeps_staging_writes_inside_opened_parent_after_symlink_swap(tmp_path: Path) -> None:
+    writer = load_writer_module()
+    assert callable(getattr(writer, "create_staging_directory", None))
+    output_root = tmp_path / "out"
+    target_dir = output_root / "source"
+    target_dir.mkdir(parents=True)
+    moved_parent = tmp_path / "moved-source"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    real_create_staging = writer.create_staging_directory
+
+    def create_staging_then_swap(parent_fd: int, run_name: str) -> str:
+        staging_name = real_create_staging(parent_fd, run_name)
+        target_dir.rename(moved_parent)
+        target_dir.symlink_to(outside, target_is_directory=True)
+        return staging_name
+
+    from pytest import MonkeyPatch
+
+    swap_patch = MonkeyPatch()
+    swap_patch.setattr(writer, "create_staging_directory", create_staging_then_swap)
+    try:
+        writer.write_markdown_report(
+            "# report\n",
+            mode="full",
+            target="src/source.py",
+            output_root=output_root,
+            run_id="symlink-swap",
+        )
+    finally:
+        swap_patch.undo()
+
+    assert not (outside / "run_symlink-swap").exists()
+    assert (moved_parent / "run_symlink-swap" / "report.md").read_text(encoding="utf-8") == "# report\n"
 
 
 def test_write_report_rejects_quick_mode(tmp_path: Path) -> None:
