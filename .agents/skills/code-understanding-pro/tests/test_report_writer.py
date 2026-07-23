@@ -221,7 +221,6 @@ def test_write_explicit_report_redacts_shell_values_without_consuming_delimiters
     writer.write_explicit_report(
         "\n".join(
             (
-                "TOKEN=`backtick-secret`; echo ok # backtick comment",
                 "TOKEN=plain-secret; echo ok # plain comment",
                 "export API_KEY=comment-secret # keep this comment",
                 "TOKEN=secret#suffix",
@@ -234,14 +233,13 @@ def test_write_explicit_report_redacts_shell_values_without_consuming_delimiters
 
     saved_lines = output_path.read_text(encoding="utf-8").splitlines()
     assert saved_lines == [
-        "TOKEN=`[REDACTED]`; echo ok # backtick comment",
         "TOKEN=[REDACTED]; echo ok # plain comment",
         "export API_KEY=[REDACTED] # keep this comment",
         "TOKEN=[REDACTED]",
         "TOKEN=[REDACTED] # separate comment",
     ]
     saved = "\n".join(saved_lines)
-    for secret in ("backtick-secret", "plain-secret", "comment-secret", "secret", "suffix"):
+    for secret in ("plain-secret", "comment-secret", "secret", "suffix"):
         assert secret not in saved
 
 
@@ -881,3 +879,109 @@ def test_output_contract_documents_incomplete_artifacts_and_trust_boundary() -> 
         assert "利用者が削除" in document
         assert "信頼済み非共有ディレクトリ" in document
         assert "同一UID" in document
+
+
+def test_multiline_assignment_and_backtick_command_substitution_fail_before_output(tmp_path: Path) -> None:
+    writer = load_writer_module()
+    output_root = tmp_path / "out"
+
+    for index, content in enumerate(("TOKEN=\nabc def\n", "TOKEN=`command-secret`\n")):
+        try:
+            writer.write_markdown_report(
+                content,
+                mode="full",
+                target="src/source.py",
+                output_root=output_root,
+                run_id=f"multiline-{index}",
+            )
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"曖昧な秘密形式を拒否しなければなりません: {content!r}")
+
+        assert not (output_root / "source" / f"run_multiline-{index}").exists()
+
+
+def test_bearer_redaction_preserves_json_syntax(tmp_path: Path) -> None:
+    writer = load_writer_module()
+    output_path = tmp_path / "authorization.json"
+    writer.write_explicit_report('{"authorization":"Bearer abc.def-123","ok":true}\n', output_path)
+
+    assert json.loads(output_path.read_text(encoding="utf-8")) == {
+        "authorization": "Bearer [REDACTED]",
+        "ok": True,
+    }
+
+
+def test_complete_pkcs8_private_key_is_redacted(tmp_path: Path) -> None:
+    writer = load_writer_module()
+    output_path = tmp_path / "private-key.md"
+    writer.write_explicit_report(
+        "-----BEGIN PRIVATE KEY-----\nTOPSECRET\n-----END PRIVATE KEY-----\n",
+        output_path,
+    )
+
+    saved = output_path.read_text(encoding="utf-8")
+    assert saved == "[REDACTED PRIVATE KEY]\n"
+    assert "TOPSECRET" not in saved
+
+
+def test_run_keeps_incomplete_marker_when_final_directory_fsync_fails(tmp_path: Path) -> None:
+    writer = load_writer_module()
+    output_root = tmp_path / "out"
+    real_fsync_directory = writer.fsync_directory
+    calls = 0
+
+    def fail_second_directory_fsync(directory_fd: int) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("directory fsync failed")
+        real_fsync_directory(directory_fd)
+
+    from pytest import MonkeyPatch
+
+    patch = MonkeyPatch()
+    patch.setattr(writer, "fsync_directory", fail_second_directory_fsync)
+    try:
+        try:
+            writer.write_markdown_report(
+                "# report\n",
+                mode="full",
+                target="src/source.py",
+                output_root=output_root,
+                run_id="fsync-failure",
+            )
+        except OSError as error:
+            assert "directory fsync failed" in str(error)
+        else:
+            raise AssertionError("directory fsync失敗を伝播しなければなりません")
+    finally:
+        patch.undo()
+
+    assert (output_root / "source" / "run_fsync-failure" / ".incomplete").exists()
+
+
+def test_explicit_directory_fsync_failure_is_propagated(tmp_path: Path) -> None:
+    writer = load_writer_module()
+    output_path = tmp_path / "explicit.md"
+
+    from pytest import MonkeyPatch
+
+    patch = MonkeyPatch()
+    patch.setattr(
+        writer,
+        "fsync_directory",
+        lambda directory_fd: (_ for _ in ()).throw(OSError("directory fsync failed")),
+    )
+    try:
+        try:
+            writer.write_explicit_report("# report\n", output_path)
+        except OSError as error:
+            assert "directory fsync failed" in str(error)
+        else:
+            raise AssertionError("directory fsync失敗を伝播しなければなりません")
+    finally:
+        patch.undo()
+
+    assert output_path.exists()

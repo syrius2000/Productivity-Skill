@@ -32,7 +32,7 @@ DISPLAY_MODES = {
 }
 INTERFACE_VERSION = "2.0"
 SECRET_KEY = r"(?:[A-Za-z0-9_-]*(?:api[_-]?key|password|passwd|secret|token)[A-Za-z0-9_-]*)"
-ASSIGNMENT_PREFIX = rf"(?<![\w-])(?:export\s+)?[\"']?{SECRET_KEY}[\"']?\s*[:=]\s*"
+ASSIGNMENT_PREFIX = rf"(?<![\w-])(?:export[ \t]+)?[\"']?{SECRET_KEY}[\"']?[ \t]*[:=][ \t]*"
 
 
 def reject_ambiguous_secret_syntax(text: str) -> None:
@@ -46,14 +46,13 @@ def reject_ambiguous_secret_syntax(text: str) -> None:
         stripped = value.lstrip()
         if stripped.startswith(("|", ">")):
             raise ValueError("曖昧な秘密形式のため保存を中止しました")
-        if stripped.startswith(("$'", '$"', "$(")) or "$(" in stripped:
+        if stripped.startswith(("$'", '$"', "$(", "\x60")) or "$(" in stripped:
             raise ValueError("曖昧な秘密形式のため保存を中止しました")
-        if value.startswith(("'", '"', "\x60")):
+        if value.startswith(("'", '"')):
             quote = value[0]
             patterns = {
                 '"': r'^"(?:\\.|[^"\\\r\n])*"',
                 "'": r"^'(?:\\.|''|[^'\\\r\n])*'",
-                "\x60": r"^\x60(?:\\.|[^\x60\\\r\n])*\x60",
             }
             quoted = re.match(patterns[quote], value)
             if not quoted:
@@ -84,20 +83,18 @@ def redact_secrets(text: str) -> str:
         flags=re.IGNORECASE | re.MULTILINE,
     )
     text = re.sub(
-        rf"(?P<prefix>{ASSIGNMENT_PREFIX})(?P<quote>\x60)(?P<value>(?:\\.|[^\x60\\\r\n])*)(?P=quote)",
-        replace_quoted,
-        text,
-        flags=re.IGNORECASE | re.MULTILINE,
-    )
-    text = re.sub(
         rf"(?P<prefix>{ASSIGNMENT_PREFIX})(?![\"'\x60])(?P<value>[^\s,}}\]\x60;|&()<>]+)",
         r"\g<prefix>[REDACTED]",
         text,
         flags=re.IGNORECASE | re.MULTILINE,
     )
-    text = re.sub(r"(?i)(\bBearer\s+)[^\s`]+", r"\1[REDACTED]", text)
     text = re.sub(
-        r"-----BEGIN [^-]+ PRIVATE KEY-----.*?-----END [^-]+ PRIVATE KEY-----",
+        r"(?i)(\bBearer[ \t]+)[A-Za-z0-9._~+/=-]+",
+        r"\1[REDACTED]",
+        text,
+    )
+    text = re.sub(
+        r"-----BEGIN (?:[^-\r\n]+ )?PRIVATE KEY-----.*?-----END (?:[^-\r\n]+ )?PRIVATE KEY-----",
         "[REDACTED PRIVATE KEY]",
         text,
         flags=re.DOTALL,
@@ -105,7 +102,7 @@ def redact_secrets(text: str) -> str:
     for match in re.finditer(rf"(?im){ASSIGNMENT_PREFIX}(?P<value>[^\r\n]*)", text):
         if "[REDACTED]" not in match.group("value"):
             raise ValueError("秘密値を完全に伏字化できないため保存を中止しました")
-    if re.search(r"(?i)\bBearer\s+(?!\[REDACTED\])\S+", text):
+    if re.search(r"(?i)\bBearer[ \t]+(?!\[REDACTED\])\S+", text):
         raise ValueError("秘密値を完全に伏字化できないため保存を中止しました")
     if re.search(r"-----BEGIN [^-]*PRIVATE KEY-----", text):
         raise ValueError("秘密値を完全に伏字化できないため保存を中止しました")
@@ -349,9 +346,18 @@ def write_markdown_report(
                 write_file_at(run_fd, report_file, redacted_content)
                 write_file_at(run_fd, "run_meta.json", metadata_text)
                 write_file_at(run_fd, "source_manifest.json", source_manifest_text)
-                os.unlink(".incomplete", dir_fd=run_fd)
                 fsync_directory(run_fd)
                 fsync_directory(target_fd)
+                os.unlink(".incomplete", dir_fd=run_fd)
+                try:
+                    fsync_directory(run_fd)
+                    fsync_directory(target_fd)
+                except OSError:
+                    try:
+                        write_file_at(run_fd, ".incomplete", "report generation failed during final sync\n")
+                    except FileExistsError:
+                        pass
+                    raise
             finally:
                 os.close(run_fd)
         finally:
@@ -372,10 +378,7 @@ def write_explicit_report(content: str, output_path: Path) -> Path:
             write_text_to_fd(output_fd, redacted_content, fsync=True)
         finally:
             os.close(output_fd)
-        try:
-            fsync_directory(parent_fd)
-        except OSError:
-            pass
+        fsync_directory(parent_fd)
     finally:
         os.close(parent_fd)
     return canonical_output_path
