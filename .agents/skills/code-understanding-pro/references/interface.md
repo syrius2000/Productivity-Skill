@@ -36,6 +36,8 @@ skill_out/code_understanding/<target>/run_<id>/
 
 `code_context.md` は収集した生テキストを含む補助資料であり、Full、Review、Documentation、Refactoringの `report.md` 契約の対象外である。必須見出しを満たすことを要求せず、`validate_report.py` の検証CLIの対象外とする。収集結果をそのまま `report.md` へ強制してはならない。
 
+Context成果物の `run_meta.json` は `mode=Context` と `report_file=code_context.md` を記録する。
+
 Contextの `source_manifest.json` は、実際に `code_context.md` へ出力された各ファイルを記録する。ディレクトリ引数は実際に出力されたファイルへ展開し、出力上限などで省略されたファイルやディレクトリ自体は記録しない。
 
 ## `run_meta.json`
@@ -45,11 +47,11 @@ Contextの `source_manifest.json` は、実際に `code_context.md` へ出力さ
 | `interface_version` | string | この契約の版 |
 | `skill` | string | 成果物を所有するSkill |
 | `skill_version` | string | Skill版 |
-| `mode` | string | Full / Review / Documentation / Refactoring |
+| `mode` | string | Full / Review / Documentation / Refactoring。Context成果物では `Context` |
 | `adapter` | string | `generic` / `sql` / `stats` |
 | `audience` | string | `beginner` / `practitioner` / `expert` |
 | `target` | string | 解析対象 |
-| `report_file` | string | 常に `report.md` |
+| `report_file` | string | 通常成果物では `report.md`、Context成果物では `code_context.md` |
 | `generated_at` | string | JSTを含むISO 8601時刻 |
 
 ## `source_manifest.json`

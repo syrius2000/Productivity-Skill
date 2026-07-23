@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import subprocess
 import sys
 from pathlib import Path
@@ -18,6 +19,14 @@ def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
         capture_output=True,
         check=False,
     )
+
+
+def load_writer_module():
+    spec = importlib.util.spec_from_file_location("write_report_under_test", WRITER)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_write_report_creates_markdown_and_metadata(tmp_path: Path) -> None:
@@ -125,6 +134,139 @@ def test_write_report_redacts_common_secrets(tmp_path: Path) -> None:
     assert "[REDACTED]" in saved
 
 
+def test_write_report_redacts_json_yaml_quoted_and_environment_secret_values(tmp_path: Path) -> None:
+    content_path = tmp_path / "content.md"
+    secret_values = ("json-api-key", "yaml-password", "quoted-secret", "environment-token")
+    content_path.write_text(
+        """{
+  "api_key": "json-api-key"
+}
+password: yaml-password
+secret: 'quoted-secret'
+export TOKEN="environment-token"
+""",
+        encoding="utf-8",
+    )
+
+    result = run_cli(
+        WRITER,
+        "--mode",
+        "documentation",
+        "--target",
+        "src/source.py",
+        "--content-file",
+        str(content_path),
+        "--output-root",
+        str(tmp_path / "out"),
+        "--run-id",
+        "structured-secrets",
+    )
+
+    assert result.returncode == 0, result.stderr
+    saved = (tmp_path / "out" / "source" / "run_structured-secrets" / "report.md").read_text(
+        encoding="utf-8"
+    )
+    for secret in secret_values:
+        assert secret not in saved
+    assert saved.count("[REDACTED]") >= len(secret_values)
+
+
+def test_write_report_rejects_unsafe_run_ids(tmp_path: Path) -> None:
+    content_path = tmp_path / "content.md"
+    content_path.write_text("# report\n", encoding="utf-8")
+
+    for run_id in ("../escape", str(tmp_path / "absolute"), "nested/run", r"nested\\run", "run..escape"):
+        result = run_cli(
+            WRITER,
+            "--mode",
+            "full",
+            "--target",
+            "src/source.py",
+            "--content-file",
+            str(content_path),
+            "--output-root",
+            str(tmp_path / "out"),
+            "--run-id",
+            run_id,
+        )
+
+        assert result.returncode != 0
+        assert "run-id" in result.stderr
+
+
+def test_write_report_rejects_resolved_output_outside_target_directory(tmp_path: Path) -> None:
+    content_path = tmp_path / "content.md"
+    content_path.write_text("# report\n", encoding="utf-8")
+    output_root = tmp_path / "out"
+    output_root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (output_root / "source").symlink_to(outside, target_is_directory=True)
+
+    result = run_cli(
+        WRITER,
+        "--mode",
+        "full",
+        "--target",
+        "src/source.py",
+        "--content-file",
+        str(content_path),
+        "--output-root",
+        str(output_root),
+        "--run-id",
+        "containment",
+    )
+
+    assert result.returncode != 0
+    assert "出力先" in result.stderr
+    assert not (outside / "run_containment").exists()
+
+
+def test_write_report_cleans_staging_directory_after_failure_and_allows_retry(tmp_path: Path) -> None:
+    writer = load_writer_module()
+    output_root = tmp_path / "out"
+    original_write_text = Path.write_text
+
+    def fail_metadata_write(path: Path, *args: object, **kwargs: object) -> int:
+        if path.name == "run_meta.json":
+            raise OSError("metadata write failed")
+        return original_write_text(path, *args, **kwargs)
+
+    from pytest import MonkeyPatch
+
+    failing_patch = MonkeyPatch()
+    failing_patch.setattr(Path, "write_text", fail_metadata_write)
+    try:
+        try:
+            writer.write_markdown_report(
+                "# report\n",
+                mode="full",
+                target="src/source.py",
+                output_root=output_root,
+                run_id="retry",
+            )
+        except OSError as error:
+            assert "metadata write failed" in str(error)
+        else:
+            raise AssertionError("metadata write failure must propagate")
+    finally:
+        failing_patch.undo()
+
+    run_dir = output_root / "source" / "run_retry"
+    assert not run_dir.exists()
+    assert not list((output_root / "source").glob(".run_retry.tmp-*"))
+
+    report_path = writer.write_markdown_report(
+        "# report\n",
+        mode="full",
+        target="src/source.py",
+        output_root=output_root,
+        run_id="retry",
+    )
+    assert report_path == run_dir / "report.md"
+    assert report_path.read_text(encoding="utf-8") == "# report\n"
+
+
 def test_write_report_rejects_quick_mode(tmp_path: Path) -> None:
     content_path = tmp_path / "content.md"
     content_path.write_text("# quick\n", encoding="utf-8")
@@ -226,3 +368,14 @@ def test_context_artifact_contract_is_documented_as_validator_incompatible() -> 
         assert "code_context.md" in document
         assert "Context" in document
         assert "検証CLIの対象外" in document
+
+
+def test_interface_documents_context_metadata_contract() -> None:
+    interface = (SKILL_DIR / "references" / "interface.md").read_text(encoding="utf-8")
+
+    assert "`mode`" in interface
+    assert "`Context`" in interface
+    assert "`report_file`" in interface
+    assert "`code_context.md`" in interface
+    assert "mode=Context" in interface
+    assert "report_file=code_context.md" in interface

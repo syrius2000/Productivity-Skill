@@ -7,7 +7,9 @@ import argparse
 import hashlib
 import json
 import re
+import shutil
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -33,10 +35,23 @@ INTERFACE_VERSION = "2.0"
 
 def redact_secrets(text: str) -> str:
     """一般的なキー、パスワード、トークンをMarkdown保存前に伏せ字にする。"""
+    secret_key = r"(?:api[_-]?key|password|passwd|secret|token)"
+    assignment_prefix = rf"(?<![\w-])(?:export\s+)?[\"']?{secret_key}[\"']?\s*[:=]\s*"
+
+    def replace_quoted(match: re.Match[str]) -> str:
+        return f"{match.group('prefix')}{match.group('quote')}[REDACTED]{match.group('quote')}"
+
     text = re.sub(
-        r"(?i)(\b(?:api[_-]?key|password|passwd|secret|token)\b\s*[:=]\s*)([^\s`]+)",
-        r"\1[REDACTED]",
+        rf"(?P<prefix>{assignment_prefix})(?P<quote>[\"'])(?P<value>.*?)(?P=quote)",
+        replace_quoted,
         text,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+    text = re.sub(
+        rf"(?P<prefix>{assignment_prefix})(?![\"'])(?P<value>[^\s,}}\]`]+)",
+        r"\g<prefix>[REDACTED]",
+        text,
+        flags=re.IGNORECASE | re.MULTILINE,
     )
     text = re.sub(r"(?i)(\bBearer\s+)[^\s`]+", r"\1[REDACTED]", text)
     text = re.sub(
@@ -60,9 +75,38 @@ def default_run_id() -> str:
     return datetime.now(ZoneInfo("Asia/Tokyo")).strftime("%Y%m%d_%H%M%S")
 
 
+def validate_run_id(run_id: str) -> str:
+    """run IDを単一の安全なパス要素に限定する。"""
+    if (
+        not run_id
+        or Path(run_id).is_absolute()
+        or ".." in run_id
+        or "/" in run_id
+        or "\\" in run_id
+    ):
+        raise ValueError("--run-id は絶対パス、..、/、\\ を含まない安全な単一要素にしてください")
+    return run_id
+
+
+def ensure_output_containment(output_root: Path, target_dir: Path, run_dir: Path) -> None:
+    """解決後のrun出力先がoutput rootとtargetディレクトリに収まることを確認する。"""
+    resolved_root = output_root.resolve(strict=False)
+    resolved_target = target_dir.resolve(strict=False)
+    resolved_run = run_dir.resolve(strict=False)
+    try:
+        resolved_target.relative_to(resolved_root)
+        resolved_run.relative_to(resolved_target)
+    except ValueError as error:
+        raise ValueError("解決後の出力先が <output-root>/<target> 配下ではありません") from error
+
+
 def run_directory(output_root: Path, target: str, run_id: str) -> Path:
+    run_id = validate_run_id(run_id)
     run_name = run_id if run_id.startswith("run_") else f"run_{run_id}"
-    return output_root / slugify_target(target) / run_name
+    target_dir = output_root / slugify_target(target)
+    run_dir = target_dir / run_name
+    ensure_output_containment(output_root, target_dir, run_dir)
+    return run_dir
 
 
 def skill_version() -> str:
@@ -113,37 +157,46 @@ def write_markdown_report(
         raise ValueError(f"未対応の出力モードです: {mode}")
 
     run_dir = run_directory(output_root, target, run_id or default_run_id())
+    target_dir = run_dir.parent
+    target_dir.mkdir(parents=True, exist_ok=True)
+    ensure_output_containment(output_root, target_dir, run_dir)
     if run_dir.exists():
         raise FileExistsError(f"出力先が既に存在します（上書きしません）: {run_dir}")
-    run_dir.mkdir(parents=True, exist_ok=False)
 
-    report_file = REPORT_FILENAMES[mode_key]
-    report_path = run_dir / report_file
-    report_path.write_text(redact_secrets(content), encoding="utf-8")
-    metadata = {
-        "interface_version": INTERFACE_VERSION,
-        "skill": "code-understanding-pro",
-        "skill_version": skill_version(),
-        "mode": DISPLAY_MODES[mode_key],
-        "adapter": adapter,
-        "audience": audience,
-        "target": target,
-        "report_file": report_file,
-        "generated_at": datetime.now(ZoneInfo("Asia/Tokyo")).isoformat(),
-    }
-    (run_dir / "run_meta.json").write_text(
-        json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    source_manifest = {
-        "interface_version": INTERFACE_VERSION,
-        "sources": [source_entry(source) for source in sources or []],
-    }
-    (run_dir / "source_manifest.json").write_text(
-        json.dumps(source_manifest, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    return report_path
+    staging_dir = Path(tempfile.mkdtemp(prefix=f".{run_dir.name}.tmp-", dir=target_dir))
+    try:
+        report_file = REPORT_FILENAMES[mode_key]
+        (staging_dir / report_file).write_text(redact_secrets(content), encoding="utf-8")
+        metadata = {
+            "interface_version": INTERFACE_VERSION,
+            "skill": "code-understanding-pro",
+            "skill_version": skill_version(),
+            "mode": DISPLAY_MODES[mode_key],
+            "adapter": adapter,
+            "audience": audience,
+            "target": target,
+            "report_file": report_file,
+            "generated_at": datetime.now(ZoneInfo("Asia/Tokyo")).isoformat(),
+        }
+        (staging_dir / "run_meta.json").write_text(
+            json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        source_manifest = {
+            "interface_version": INTERFACE_VERSION,
+            "sources": [source_entry(source) for source in sources or []],
+        }
+        (staging_dir / "source_manifest.json").write_text(
+            json.dumps(source_manifest, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        if run_dir.exists():
+            raise FileExistsError(f"出力先が既に存在します（上書きしません）: {run_dir}")
+        staging_dir.rename(run_dir)
+    except BaseException:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        raise
+    return run_dir / report_file
 
 
 def write_explicit_report(content: str, output_path: Path) -> Path:
