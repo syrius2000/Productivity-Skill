@@ -4,6 +4,28 @@ AI コーディングエージェント（Antigravity, Cursor, Claude Code, Code
 
 ---
 
+## 🧭 汎用Skillの正本と編集先
+
+`Productivity-Skill` は、汎用的なコード理解・開発生産性Skillの正本です。一般コード、SQL、統計コードの理解・レビューを改善する場合は、このリポジトリ内のSkillを編集します。
+
+| 編集したい領域 | 正本リポジトリ | 編集先・責任範囲 |
+| --- | --- | --- |
+| 汎用コード理解・開発生産性 | このリポジトリ | [`.agents/skills/`](./.agents/skills/) 配下。`code-understanding-pro` は親Skillとして、一般コードを `generic`、SQLを `sql`、R/Python統計コードを `stats` に分岐する。 |
+| DB固有SkillとRWDワークフロー | [rwd-mysql-skill-toolkit](https://github.com/syrius2000/rwd-mysql-skill-toolkit) | DB固有Skillの正本であり、`Productivity-Skill` と `agentic-evidence-analysis` を利用する「RWDデータワークフローの実行・統合ハブ」。 |
+| VCD・統計的エビデンス分析 | [agentic-evidence-analysis](https://github.com/syrius2000/agentic-evidence-analysis) | VCD・統計的エビデンス分析Skillの正本。 |
+
+### コード理解スイート
+
+| Skill | 現行バージョン | 役割 |
+| --- | --- | --- |
+| [`code-understanding-pro`](./.agents/skills/code-understanding-pro/SKILL.md) | 2.0.0-ja | 親Skill。対象を判定し、一般コードは `generic`、SQLは `sql`、R/Python統計コードは `stats` へ分岐して、共通の成果物契約に統合する。 |
+| [`code-understanding-pyramid`](./.agents/skills/code-understanding-pyramid/SKILL.md) | 3.0.0 | 5段階の理解順序を提供する共通フレームワーク。 |
+| [`stats-sql-comprehension`](./.agents/skills/stats-sql-comprehension/SKILL.md) | 2.0.0 | SQL・dbt・BigQueryとR/Python統計解析の専門アダプター。 |
+
+移行の根拠、削除前ソースツリーの監査用ダイジェスト、および検証結果は [Skill正本・移行インベントリ](./docs/Artifacts/skill_ownership_inventory_008_0724.md) を参照してください。
+
+---
+
 ## 🚀 はじめに (Getting Started)
 
 本リポジトリ内のスキルはすべて `npx skills` (Agent Skills Standard) に準拠しています。
@@ -24,7 +46,7 @@ npx skills add syrius2000/Productivity-Skill -g
 
 ### 1. 📊 統計解析＆SQL高度解読
 
-#### 📈 **`stats-sql-comprehension`**
+#### 📈 **`stats-sql-comprehension`** (v2.0.0)
 - **概要**: 複雑な分析用SQL（dbt, BigQuery, CTE, ウィンドウ関数）や統計解析コード（R, Python）を5段階ピラミッドで解読・可視化・評価するスキル。
 - **特徴**: CTEや結合構造のMermaidリネージ図作成、フルスキャンや多対多結合による行数膨張リスクの検出、統計的バイアス（選択・生存者バイアス等）の検証を行います。
 - **起動条件**: 「このSQLを説明して」「クエリを解読して」「dbtモデルを解説して」「データフローを可視化して」「統計コードをレビューして」「SQLのパフォーマンスを評価して」
@@ -33,12 +55,12 @@ npx skills add syrius2000/Productivity-Skill -g
 
 ### 2. 🔍 コード理解・レビュー・リファクタリング
 
-#### 📖 **`code-understanding-pro`**
+#### 📖 **`code-understanding-pro`** (v2.0.0-ja)
 - **概要**: 既存コードの段階的理解、詳細解析、コードレビュー、ドキュメント化、安全なリファクタリング支援を包括的に行う日本語スキル。
 - **特徴**: 5段階の「理解のピラミッド」に従い、コードの事実・推測・不確実性・リスクを明確に分離して出力します。
 - **起動条件**: 「このコードを説明して」「レビューして」「QAして」「リファクタリング案を出して」「DocStringを書いて」
 
-#### 🏛️ **`code-understanding-pyramid`**
+#### 🏛️ **`code-understanding-pyramid`** (v3.0.0)
 - **概要**: AIソフトウェアアーキテクトとして、構造把握（準備・概要・詳細・深い理解・活用）を順番に追跡して分析するスキル。
 - **特徴**: 意図やテストコードを最優先に検証し、`[CRITICAL]`, `[CONSIDER]`, `[NIT]`, `[FYI]` のマージ基準付きフィードバックを提供。
 - **起動条件**: 「review」「explain」「analyze」などの解析要求
