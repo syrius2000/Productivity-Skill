@@ -223,6 +223,9 @@ def test_write_explicit_report_redacts_shell_values_without_consuming_delimiters
                 "TOKEN=`backtick-secret`; echo ok # backtick comment",
                 "TOKEN=plain-secret; echo ok # plain comment",
                 "export API_KEY=comment-secret # keep this comment",
+                "TOKEN=secret#suffix",
+                "TOKEN=secret # separate comment",
+                "TOKEN=`unterminated-secret",
             )
         )
         + "\n",
@@ -234,9 +237,12 @@ def test_write_explicit_report_redacts_shell_values_without_consuming_delimiters
         "TOKEN=`[REDACTED]`; echo ok # backtick comment",
         "TOKEN=[REDACTED]; echo ok # plain comment",
         "export API_KEY=[REDACTED] # keep this comment",
+        "TOKEN=[REDACTED]",
+        "TOKEN=[REDACTED] # separate comment",
+        "TOKEN=`[REDACTED]",
     ]
     saved = "\n".join(saved_lines)
-    for secret in ("backtick-secret", "plain-secret", "comment-secret"):
+    for secret in ("backtick-secret", "plain-secret", "comment-secret", "secret", "suffix", "unterminated"):
         assert secret not in saved
 
 
@@ -391,27 +397,31 @@ def test_write_report_preserves_competing_run_and_cleans_staging_directory(tmp_p
     assert not list(target_dir.glob(".run_collision.tmp-*"))
 
 
-def test_write_report_keeps_staging_writes_inside_opened_parent_after_symlink_swap(tmp_path: Path) -> None:
+def test_write_report_keeps_writes_inside_opened_ancestor_after_symlink_swap(tmp_path: Path) -> None:
     writer = load_writer_module()
-    assert callable(getattr(writer, "create_staging_directory", None))
-    output_root = tmp_path / "out"
-    target_dir = output_root / "source"
-    target_dir.mkdir(parents=True)
-    moved_parent = tmp_path / "moved-source"
+    assert callable(getattr(writer, "open_directory_path", None))
+    assert callable(getattr(writer, "open_child_directory", None))
+    ancestor = tmp_path / "ancestor"
+    ancestor.mkdir()
+    output_root = ancestor / "out"
+    moved_ancestor = tmp_path / "moved-ancestor"
     outside = tmp_path / "outside"
     outside.mkdir()
-    real_create_staging = writer.create_staging_directory
+    real_open_child = writer.open_child_directory
+    swapped = False
 
-    def create_staging_then_swap(parent_fd: int, run_name: str) -> str:
-        staging_name = real_create_staging(parent_fd, run_name)
-        target_dir.rename(moved_parent)
-        target_dir.symlink_to(outside, target_is_directory=True)
-        return staging_name
+    def open_child_then_swap(parent_fd: int, name: str, *, create: bool) -> int:
+        nonlocal swapped
+        if name == "source" and not swapped:
+            swapped = True
+            ancestor.rename(moved_ancestor)
+            ancestor.symlink_to(outside, target_is_directory=True)
+        return real_open_child(parent_fd, name, create=create)
 
     from pytest import MonkeyPatch
 
     swap_patch = MonkeyPatch()
-    swap_patch.setattr(writer, "create_staging_directory", create_staging_then_swap)
+    swap_patch.setattr(writer, "open_child_directory", open_child_then_swap)
     try:
         writer.write_markdown_report(
             "# report\n",
@@ -423,78 +433,122 @@ def test_write_report_keeps_staging_writes_inside_opened_parent_after_symlink_sw
     finally:
         swap_patch.undo()
 
-    assert not (outside / "run_symlink-swap").exists()
-    assert (moved_parent / "run_symlink-swap" / "report.md").read_text(encoding="utf-8") == "# report\n"
+    assert not (outside / "out" / "source" / "run_symlink-swap").exists()
+    assert (
+        moved_ancestor / "out" / "source" / "run_symlink-swap" / "report.md"
+    ).read_text(encoding="utf-8") == "# report\n"
 
 
-def test_write_explicit_report_preserves_competing_file_and_cleans_staging_file(tmp_path: Path) -> None:
+def test_write_explicit_report_reserves_final_name_without_hard_link(tmp_path: Path) -> None:
     writer = load_writer_module()
-    assert callable(getattr(writer, "create_explicit_staging_file", None))
+    assert callable(getattr(writer, "reserve_explicit_output_file", None))
     output_path = tmp_path / "output" / "explicit.md"
     output_path.parent.mkdir()
-    real_create_staging = writer.create_explicit_staging_file
+    real_write = writer.write_text_to_fd
 
-    def create_staging_then_compete(parent_fd: int, final_name: str) -> tuple[str, int]:
-        staging_name, staging_fd = real_create_staging(parent_fd, final_name)
-        competing_fd = os.open(
-            final_name,
-            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-            0o600,
-            dir_fd=parent_fd,
-        )
-        try:
-            os.write(competing_fd, b"incumbent\n")
-        finally:
-            os.close(competing_fd)
-        return staging_name, staging_fd
+    def observe_reserved_name(fd: int, text: str, *, fsync: bool = False) -> None:
+        assert output_path.exists()
+        real_write(fd, text, fsync=fsync)
+
+    def reject_hard_link(*args: object, **kwargs: object) -> None:
+        raise AssertionError("explicit保存はos.linkを使用してはなりません")
 
     from pytest import MonkeyPatch
 
-    collision_patch = MonkeyPatch()
-    collision_patch.setattr(writer, "create_explicit_staging_file", create_staging_then_compete)
+    direct_patch = MonkeyPatch()
+    direct_patch.setattr(writer, "write_text_to_fd", observe_reserved_name)
+    direct_patch.setattr(os, "link", reject_hard_link)
     try:
+        writer.write_explicit_report("# candidate\n", output_path)
+    finally:
+        direct_patch.undo()
+
+    assert output_path.read_text(encoding="utf-8") == "# candidate\n"
+
+
+def test_write_explicit_report_rejects_existing_file_directory_and_dangling_symlink(tmp_path: Path) -> None:
+    writer = load_writer_module()
+    parent_dir = tmp_path / "output"
+    parent_dir.mkdir()
+    outside = tmp_path / "outside.md"
+
+    existing_file = parent_dir / "file.md"
+    existing_file.write_text("incumbent\n", encoding="utf-8")
+    existing_directory = parent_dir / "directory.md"
+    existing_directory.mkdir()
+    dangling_symlink = parent_dir / "link.md"
+    dangling_symlink.symlink_to(outside)
+
+    for output_path in (existing_file, existing_directory, dangling_symlink):
         try:
             writer.write_explicit_report("# candidate\n", output_path)
         except FileExistsError:
             pass
         else:
-            raise AssertionError("競合ファイルがある場合はpublishに失敗しなければなりません")
-    finally:
-        collision_patch.undo()
+            raise AssertionError(f"既存entryを拒否しなければなりません: {output_path.name}")
 
-    assert output_path.read_text(encoding="utf-8") == "incumbent\n"
-    assert not list(output_path.parent.glob(".explicit.md.tmp-*"))
+    assert existing_file.read_text(encoding="utf-8") == "incumbent\n"
+    assert existing_directory.is_dir()
+    assert dangling_symlink.is_symlink()
+    assert not outside.exists()
+
+
+def test_write_explicit_report_cleans_reserved_name_after_write_failure(tmp_path: Path) -> None:
+    writer = load_writer_module()
+    output_path = tmp_path / "output" / "explicit.md"
+    output_path.parent.mkdir()
+
+    def fail_write(fd: int, text: str, *, fsync: bool = False) -> None:
+        del fd, text, fsync
+        assert output_path.exists()
+        raise OSError("write failed")
+
+    from pytest import MonkeyPatch
+
+    failure_patch = MonkeyPatch()
+    failure_patch.setattr(writer, "write_text_to_fd", fail_write)
+    try:
+        try:
+            writer.write_explicit_report("# candidate\n", output_path)
+        except OSError as error:
+            assert "write failed" in str(error)
+        else:
+            raise AssertionError("書込み失敗は呼び出し元へ伝播しなければなりません")
+    finally:
+        failure_patch.undo()
+
+    assert not output_path.exists()
 
 
 def test_write_explicit_report_keeps_writes_inside_opened_parent_after_symlink_swap(tmp_path: Path) -> None:
     writer = load_writer_module()
-    assert callable(getattr(writer, "create_explicit_staging_file", None))
-    parent_dir = tmp_path / "output"
-    parent_dir.mkdir()
+    assert callable(getattr(writer, "reserve_explicit_output_file", None))
+    ancestor = tmp_path / "ancestor"
+    parent_dir = ancestor / "output"
+    parent_dir.mkdir(parents=True)
     output_path = parent_dir / "explicit.md"
-    moved_parent = tmp_path / "moved-output"
+    moved_ancestor = tmp_path / "moved-ancestor"
     outside = tmp_path / "outside"
     outside.mkdir()
-    real_create_staging = writer.create_explicit_staging_file
+    real_reserve = writer.reserve_explicit_output_file
 
-    def create_staging_then_swap(parent_fd: int, final_name: str) -> tuple[str, int]:
-        staging_name, staging_fd = real_create_staging(parent_fd, final_name)
-        parent_dir.rename(moved_parent)
-        parent_dir.symlink_to(outside, target_is_directory=True)
-        return staging_name, staging_fd
+    def reserve_then_swap(parent_fd: int, final_name: str) -> int:
+        output_fd = real_reserve(parent_fd, final_name)
+        ancestor.rename(moved_ancestor)
+        ancestor.symlink_to(outside, target_is_directory=True)
+        return output_fd
 
     from pytest import MonkeyPatch
 
     swap_patch = MonkeyPatch()
-    swap_patch.setattr(writer, "create_explicit_staging_file", create_staging_then_swap)
+    swap_patch.setattr(writer, "reserve_explicit_output_file", reserve_then_swap)
     try:
         writer.write_explicit_report("# explicit\n", output_path)
     finally:
         swap_patch.undo()
 
-    assert not (outside / "explicit.md").exists()
-    assert (moved_parent / "explicit.md").read_text(encoding="utf-8") == "# explicit\n"
-    assert not list(moved_parent.glob(".explicit.md.tmp-*"))
+    assert not (outside / "output" / "explicit.md").exists()
+    assert (moved_ancestor / "output" / "explicit.md").read_text(encoding="utf-8") == "# explicit\n"
 
 
 def test_write_report_rejects_quick_mode(tmp_path: Path) -> None:

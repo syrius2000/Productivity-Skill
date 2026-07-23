@@ -45,6 +45,9 @@ def redact_secrets(text: str) -> str:
     def replace_quoted(match: re.Match[str]) -> str:
         return f"{match.group('prefix')}{match.group('quote')}[REDACTED]{match.group('quote')}"
 
+    def replace_unclosed_backtick(match: re.Match[str]) -> str:
+        return f"{match.group('prefix')}{match.group('quote')}[REDACTED]"
+
     text = re.sub(
         rf'(?P<prefix>{assignment_prefix})(?P<quote>")(?P<value>(?:\\.|[^"\\\r\n])*)(?P=quote)',
         replace_quoted,
@@ -64,7 +67,13 @@ def redact_secrets(text: str) -> str:
         flags=re.IGNORECASE | re.MULTILINE,
     )
     text = re.sub(
-        rf"(?P<prefix>{assignment_prefix})(?![\"'\x60])(?P<value>[^\s,}}\]\x60;#]+)",
+        rf"(?P<prefix>{assignment_prefix})(?P<quote>\x60)(?P<value>(?:\\.|[^\x60\\\r\n])*)$",
+        replace_unclosed_backtick,
+        text,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+    text = re.sub(
+        rf"(?P<prefix>{assignment_prefix})(?![\"'\x60])(?P<value>[^\s,}}\]\x60;|&()<>]+)",
         r"\g<prefix>[REDACTED]",
         text,
         flags=re.IGNORECASE | re.MULTILINE,
@@ -104,25 +113,10 @@ def validate_run_id(run_id: str) -> str:
     return run_id
 
 
-def ensure_output_containment(output_root: Path, target_dir: Path, run_dir: Path) -> None:
-    """解決後のrun出力先がoutput rootとtargetディレクトリに収まることを確認する。"""
-    resolved_root = output_root.resolve(strict=False)
-    resolved_target = target_dir.resolve(strict=False)
-    resolved_run = run_dir.resolve(strict=False)
-    try:
-        resolved_target.relative_to(resolved_root)
-        resolved_run.relative_to(resolved_target)
-    except ValueError as error:
-        raise ValueError("解決後の出力先が <output-root>/<target> 配下ではありません") from error
-
-
 def run_directory(output_root: Path, target: str, run_id: str) -> Path:
     run_id = validate_run_id(run_id)
     run_name = run_id if run_id.startswith("run_") else f"run_{run_id}"
-    target_dir = output_root / slugify_target(target)
-    run_dir = target_dir / run_name
-    ensure_output_containment(output_root, target_dir, run_dir)
-    return run_dir
+    return output_root / slugify_target(target) / run_name
 
 
 def directory_open_flags() -> int:
@@ -132,6 +126,56 @@ def directory_open_flags() -> int:
     if directory is None or nofollow is None:
         raise OSError(errno.ENOTSUP, "安全なrun出力に必要なdirectory fd機能を利用できません")
     return os.O_RDONLY | directory | nofollow
+
+
+def open_child_directory(parent_fd: int, name: str, *, create: bool) -> int:
+    """親fdの直下を必要に応じて作成し、symlinkを辿らず開く。"""
+    if not name or name in (".", "..") or "/" in name or "\\" in name:
+        raise ValueError(f"安全でないディレクトリ名です: {name!r}")
+    if create:
+        try:
+            os.mkdir(name, mode=0o700, dir_fd=parent_fd)
+        except FileExistsError:
+            pass
+    try:
+        return os.open(name, directory_open_flags(), dir_fd=parent_fd)
+    except OSError as error:
+        if error.errno in (errno.ELOOP, errno.ENOTDIR):
+            raise ValueError("出力先にsymlinkを含めることはできません") from error
+        raise
+
+
+def open_directory_path(path: Path, *, create: bool) -> int:
+    """絶対/相対パスをcomponentごとにfdで辿り、祖先symlinkを拒否する。"""
+    directory_path = Path(path)
+    if directory_path.is_absolute():
+        current_fd = os.open("/", directory_open_flags())
+        components = directory_path.parts[1:]
+    else:
+        current_fd = os.open(".", directory_open_flags())
+        components = directory_path.parts
+    try:
+        for component in components:
+            if component in ("", "."):
+                continue
+            if component == "..":
+                raise ValueError("ディレクトリパスに .. は使用できません")
+            next_fd = open_child_directory(current_fd, component, create=create)
+            os.close(current_fd)
+            current_fd = next_fd
+    except BaseException:
+        os.close(current_fd)
+        raise
+    return current_fd
+
+
+def fsync_directory(directory_fd: int) -> None:
+    """対応するファイルシステムでは親ディレクトリのentry更新も同期する。"""
+    try:
+        os.fsync(directory_fd)
+    except OSError as error:
+        if error.errno not in (errno.EINVAL, errno.ENOTSUP, errno.EOPNOTSUPP):
+            raise
 
 
 def create_staging_directory(parent_fd: int, run_name: str) -> str:
@@ -173,41 +217,23 @@ def write_file_at(directory_fd: int, filename: str, text: str) -> None:
         os.close(fd)
 
 
-def create_explicit_staging_file(parent_fd: int, final_name: str) -> tuple[str, int]:
-    """固定済みの親fd配下に、explicit保存用の一時ファイルを排他的に作成する。"""
-    for _ in range(100):
-        staging_name = f".{final_name}.tmp-{secrets.token_hex(16)}"
-        try:
-            staging_fd = os.open(
-                staging_name,
-                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-                0o600,
-                dir_fd=parent_fd,
-            )
-        except FileExistsError:
-            continue
-        return staging_name, staging_fd
-    raise FileExistsError("explicit保存用の一時ファイル名を安全に確保できません")
-
-
-def publish_explicit_staging_file(parent_fd: int, staging_name: str, final_name: str) -> None:
-    """hard linkで最終名を排他的に公開し、既存entryは一切上書きしない。"""
+def reserve_explicit_output_file(parent_fd: int, final_name: str) -> int:
+    """最終名を親fd基準で排他的に予約し、既存entryは一切上書きしない。"""
     try:
-        os.link(
-            staging_name,
+        return os.open(
             final_name,
-            src_dir_fd=parent_fd,
-            dst_dir_fd=parent_fd,
-            follow_symlinks=False,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+            0o600,
+            dir_fd=parent_fd,
         )
     except FileExistsError as error:
         raise FileExistsError(f"出力ファイルが既に存在します（上書きしません）: {final_name}") from error
 
 
-def cleanup_explicit_staging_file(parent_fd: int, staging_name: str) -> None:
-    """固定済みの親fd配下から失敗したexplicit保存用一時ファイルを除去する。"""
+def cleanup_explicit_output_file(parent_fd: int, final_name: str) -> None:
+    """失敗したexplicit保存の最終名予約を、同じ親fdから除去する。"""
     try:
-        os.unlink(staging_name, dir_fd=parent_fd)
+        os.unlink(final_name, dir_fd=parent_fd)
     except FileNotFoundError:
         pass
 
@@ -309,72 +335,80 @@ def write_markdown_report(
         raise ValueError(f"未対応の出力モードです: {mode}")
 
     run_dir = run_directory(output_root, target, run_id or default_run_id())
-    target_dir = run_dir.parent
-    target_dir.mkdir(parents=True, exist_ok=True)
-    ensure_output_containment(output_root, target_dir, run_dir)
-    parent_fd = os.open(target_dir, directory_open_flags())
+    output_root_fd = open_directory_path(output_root, create=True)
     try:
-        if entry_exists(parent_fd, run_dir.name):
-            raise FileExistsError(f"出力先が既に存在します（上書きしません）: {run_dir}")
-
-        staging_name = create_staging_directory(parent_fd, run_dir.name)
-        report_file = REPORT_FILENAMES[mode_key]
+        target_fd = open_child_directory(output_root_fd, slugify_target(target), create=True)
         try:
-            staging_fd = os.open(staging_name, directory_open_flags(), dir_fd=parent_fd)
+            if entry_exists(target_fd, run_dir.name):
+                raise FileExistsError(f"出力先が既に存在します（上書きしません）: {run_dir}")
+
+            staging_name = create_staging_directory(target_fd, run_dir.name)
+            report_file = REPORT_FILENAMES[mode_key]
             try:
-                write_file_at(staging_fd, report_file, redact_secrets(content))
-                metadata = {
-                    "interface_version": INTERFACE_VERSION,
-                    "skill": "code-understanding-pro",
-                    "skill_version": skill_version(),
-                    "mode": DISPLAY_MODES[mode_key],
-                    "adapter": adapter,
-                    "audience": audience,
-                    "target": target,
-                    "report_file": report_file,
-                    "generated_at": datetime.now(ZoneInfo("Asia/Tokyo")).isoformat(),
-                }
-                write_file_at(
-                    staging_fd,
-                    "run_meta.json",
-                    json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
-                )
-                source_manifest = {
-                    "interface_version": INTERFACE_VERSION,
-                    "sources": [source_entry(source) for source in sources or []],
-                }
-                write_file_at(
-                    staging_fd,
-                    "source_manifest.json",
-                    json.dumps(source_manifest, ensure_ascii=False, indent=2) + "\n",
-                )
-            finally:
-                os.close(staging_fd)
-            publish_staging(parent_fd, staging_name, run_dir.name)
-        except BaseException:
-            cleanup_staging_directory(parent_fd, staging_name)
-            raise
+                staging_fd = os.open(staging_name, directory_open_flags(), dir_fd=target_fd)
+                try:
+                    write_file_at(staging_fd, report_file, redact_secrets(content))
+                    metadata = {
+                        "interface_version": INTERFACE_VERSION,
+                        "skill": "code-understanding-pro",
+                        "skill_version": skill_version(),
+                        "mode": DISPLAY_MODES[mode_key],
+                        "adapter": adapter,
+                        "audience": audience,
+                        "target": target,
+                        "report_file": report_file,
+                        "generated_at": datetime.now(ZoneInfo("Asia/Tokyo")).isoformat(),
+                    }
+                    write_file_at(
+                        staging_fd,
+                        "run_meta.json",
+                        json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
+                    )
+                    source_manifest = {
+                        "interface_version": INTERFACE_VERSION,
+                        "sources": [source_entry(source) for source in sources or []],
+                    }
+                    write_file_at(
+                        staging_fd,
+                        "source_manifest.json",
+                        json.dumps(source_manifest, ensure_ascii=False, indent=2) + "\n",
+                    )
+                finally:
+                    os.close(staging_fd)
+                publish_staging(target_fd, staging_name, run_dir.name)
+                fsync_directory(target_fd)
+            except BaseException:
+                cleanup_staging_directory(target_fd, staging_name)
+                try:
+                    fsync_directory(target_fd)
+                except OSError:
+                    pass
+                raise
+        finally:
+            os.close(target_fd)
     finally:
-        os.close(parent_fd)
+        os.close(output_root_fd)
     return run_dir / report_file
 
 
 def write_explicit_report(content: str, output_path: Path) -> Path:
-    """後方互換用に、指定された単一ファイルへ保存する。"""
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    parent_fd = os.open(output_path.parent, directory_open_flags())
+    """後方互換用に、最終名を排他的に予約して指定ファイルへ保存する。"""
+    parent_fd = open_directory_path(output_path.parent, create=True)
     try:
-        staging_name, staging_fd = create_explicit_staging_file(parent_fd, output_path.name)
+        output_fd = reserve_explicit_output_file(parent_fd, output_path.name)
         try:
             try:
-                write_text_to_fd(staging_fd, redact_secrets(content), fsync=True)
+                write_text_to_fd(output_fd, redact_secrets(content), fsync=True)
             finally:
-                os.close(staging_fd)
-            publish_explicit_staging_file(parent_fd, staging_name, output_path.name)
+                os.close(output_fd)
+            fsync_directory(parent_fd)
         except BaseException:
-            cleanup_explicit_staging_file(parent_fd, staging_name)
+            cleanup_explicit_output_file(parent_fd, output_path.name)
+            try:
+                fsync_directory(parent_fd)
+            except OSError:
+                pass
             raise
-        os.unlink(staging_name, dir_fd=parent_fd)
     finally:
         os.close(parent_fd)
     return output_path
