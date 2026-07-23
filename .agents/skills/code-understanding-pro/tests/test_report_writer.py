@@ -885,7 +885,16 @@ def test_multiline_assignment_and_backtick_command_substitution_fail_before_outp
     writer = load_writer_module()
     output_root = tmp_path / "out"
 
-    for index, content in enumerate(("TOKEN=\nabc def\n", "TOKEN=`command-secret`\n")):
+    for index, content in enumerate(
+        (
+            "TOKEN=\nabc def\n",
+            "TOKEN=`command-secret`\n",
+            "TOKEN=prefix`command-secret`\n",
+            'TOKEN="prefix`command-secret`"\n',
+            "Authorization: Bearer abc:def\n",
+            "Authorization: Bearer abc`command-secret`\n",
+        )
+    ):
         try:
             writer.write_markdown_report(
                 content,
@@ -930,36 +939,39 @@ def test_run_keeps_incomplete_marker_when_final_directory_fsync_fails(tmp_path: 
     writer = load_writer_module()
     output_root = tmp_path / "out"
     real_fsync_directory = writer.fsync_directory
-    calls = 0
-
-    def fail_second_directory_fsync(directory_fd: int) -> None:
-        nonlocal calls
-        calls += 1
-        if calls == 2:
-            raise OSError("directory fsync failed")
-        real_fsync_directory(directory_fd)
 
     from pytest import MonkeyPatch
 
-    patch = MonkeyPatch()
-    patch.setattr(writer, "fsync_directory", fail_second_directory_fsync)
-    try:
-        try:
-            writer.write_markdown_report(
-                "# report\n",
-                mode="full",
-                target="src/source.py",
-                output_root=output_root,
-                run_id="fsync-failure",
-            )
-        except OSError as error:
-            assert "directory fsync failed" in str(error)
-        else:
-            raise AssertionError("directory fsync失敗を伝播しなければなりません")
-    finally:
-        patch.undo()
+    for fail_at in (3, 4):
+        calls = 0
 
-    assert (output_root / "source" / "run_fsync-failure" / ".incomplete").exists()
+        def fail_final_directory_fsync(directory_fd: int) -> None:
+            nonlocal calls
+            calls += 1
+            if calls == fail_at:
+                raise OSError("directory fsync failed")
+            real_fsync_directory(directory_fd)
+
+        patch = MonkeyPatch()
+        patch.setattr(writer, "fsync_directory", fail_final_directory_fsync)
+        try:
+            try:
+                writer.write_markdown_report(
+                    "# report\n",
+                    mode="full",
+                    target="src/source.py",
+                    output_root=output_root,
+                    run_id=f"fsync-failure-{fail_at}",
+                )
+            except OSError as error:
+                assert "directory fsync failed" in str(error)
+            else:
+                raise AssertionError("directory fsync失敗を伝播しなければなりません")
+        finally:
+            patch.undo()
+
+        run_dir = output_root / "source" / f"run_fsync-failure-{fail_at}"
+        assert (run_dir / ".incomplete").exists()
 
 
 def test_explicit_directory_fsync_failure_is_propagated(tmp_path: Path) -> None:

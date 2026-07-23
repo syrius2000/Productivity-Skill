@@ -46,7 +46,7 @@ def reject_ambiguous_secret_syntax(text: str) -> None:
         stripped = value.lstrip()
         if stripped.startswith(("|", ">")):
             raise ValueError("曖昧な秘密形式のため保存を中止しました")
-        if stripped.startswith(("$'", '$"', "$(", "\x60")) or "$(" in stripped:
+        if stripped.startswith(("$'", '$"', "$(", "\x60")) or "$(" in stripped or "\x60" in stripped:
             raise ValueError("曖昧な秘密形式のため保存を中止しました")
         if value.startswith(("'", '"')):
             quote = value[0]
@@ -61,6 +61,10 @@ def reject_ambiguous_secret_syntax(text: str) -> None:
             if tail and not re.fullmatch(r"\s*(?:[,}\]]|#.*|;.*)?", tail):
                 raise ValueError("曖昧な秘密形式のため保存を中止しました")
         elif "\\" in value:
+            raise ValueError("曖昧な秘密形式のため保存を中止しました")
+
+    for match in re.finditer(r"(?i)\bBearer[ \t]+(?P<token>[^\s\"']+)", text):
+        if not re.fullmatch(r"[A-Za-z0-9._~+/=-]+", match.group("token")):
             raise ValueError("曖昧な秘密形式のため保存を中止しました")
 
 
