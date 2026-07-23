@@ -9,7 +9,6 @@ import hashlib
 import json
 import os
 import re
-import stat
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -32,14 +31,23 @@ DISPLAY_MODES = {
     "context": "Context",
 }
 INTERFACE_VERSION = "2.0"
+SECRET_KEY = r"(?:[A-Za-z0-9_-]*(?:api[_-]?key|password|passwd|secret|token)[A-Za-z0-9_-]*)"
+ASSIGNMENT_PREFIX = rf"(?<![\w-])(?:export\s+)?[\"']?{SECRET_KEY}[\"']?\s*[:=]\s*"
 
 
 def reject_ambiguous_secret_syntax(text: str) -> None:
     """安全に構文を保持できない秘密形式は保存前に拒否する。"""
-    secret_key = r"(?:api[_-]?key|password|passwd|secret|token)"
-    assignment_prefix = rf"(?<![\w-])(?:export\s+)?[\"']?{secret_key}[\"']?\s*[:=]\s*"
-    for match in re.finditer(rf"(?im){assignment_prefix}(?P<value>[^\r\n]*)", text):
+    private_key_start = re.search(r"-----BEGIN [^-]*PRIVATE KEY-----", text)
+    if private_key_start and not re.search(r"-----END [^-]*PRIVATE KEY-----", text):
+        raise ValueError("曖昧な秘密形式のため保存を中止しました")
+
+    for match in re.finditer(rf"(?im){ASSIGNMENT_PREFIX}(?P<value>[^\r\n]*)", text):
         value = match.group("value")
+        stripped = value.lstrip()
+        if stripped.startswith(("|", ">")):
+            raise ValueError("曖昧な秘密形式のため保存を中止しました")
+        if stripped.startswith(("$'", '$"', "$(")) or "$(" in stripped:
+            raise ValueError("曖昧な秘密形式のため保存を中止しました")
         if value.startswith(("'", '"', "\x60")):
             quote = value[0]
             patterns = {
@@ -47,41 +55,42 @@ def reject_ambiguous_secret_syntax(text: str) -> None:
                 "'": r"^'(?:\\.|''|[^'\\\r\n])*'",
                 "\x60": r"^\x60(?:\\.|[^\x60\\\r\n])*\x60",
             }
-            if not re.match(patterns[quote], value):
+            quoted = re.match(patterns[quote], value)
+            if not quoted:
                 raise ValueError("曖昧な秘密形式のため保存を中止しました")
-        elif value.startswith(("$'", "$(")) or "$(" in value or "\\" in value:
+            tail = value[quoted.end() :]
+            if tail and not re.fullmatch(r"\s*(?:[,}\]]|#.*|;.*)?", tail):
+                raise ValueError("曖昧な秘密形式のため保存を中止しました")
+        elif "\\" in value:
             raise ValueError("曖昧な秘密形式のため保存を中止しました")
 
 
 def redact_secrets(text: str) -> str:
     """一般的なキー、パスワード、トークンをMarkdown保存前に伏せ字にする。"""
     reject_ambiguous_secret_syntax(text)
-    secret_key = r"(?:api[_-]?key|password|passwd|secret|token)"
-    assignment_prefix = rf"(?<![\w-])(?:export\s+)?[\"']?{secret_key}[\"']?\s*[:=]\s*"
-
     def replace_quoted(match: re.Match[str]) -> str:
         return f"{match.group('prefix')}{match.group('quote')}[REDACTED]{match.group('quote')}"
 
     text = re.sub(
-        rf'(?P<prefix>{assignment_prefix})(?P<quote>")(?P<value>(?:\\.|[^"\\\r\n])*)(?P=quote)',
+        rf'(?P<prefix>{ASSIGNMENT_PREFIX})(?P<quote>")(?P<value>(?:\\.|[^"\\\r\n])*)(?P=quote)',
         replace_quoted,
         text,
         flags=re.IGNORECASE | re.MULTILINE,
     )
     text = re.sub(
-        rf"(?P<prefix>{assignment_prefix})(?P<quote>')(?P<value>(?:\\.|''|[^'\\\r\n])*)(?P=quote)",
+        rf"(?P<prefix>{ASSIGNMENT_PREFIX})(?P<quote>')(?P<value>(?:\\.|''|[^'\\\r\n])*)(?P=quote)",
         replace_quoted,
         text,
         flags=re.IGNORECASE | re.MULTILINE,
     )
     text = re.sub(
-        rf"(?P<prefix>{assignment_prefix})(?P<quote>\x60)(?P<value>(?:\\.|[^\x60\\\r\n])*)(?P=quote)",
+        rf"(?P<prefix>{ASSIGNMENT_PREFIX})(?P<quote>\x60)(?P<value>(?:\\.|[^\x60\\\r\n])*)(?P=quote)",
         replace_quoted,
         text,
         flags=re.IGNORECASE | re.MULTILINE,
     )
     text = re.sub(
-        rf"(?P<prefix>{assignment_prefix})(?![\"'\x60])(?P<value>[^\s,}}\]\x60;|&()<>]+)",
+        rf"(?P<prefix>{ASSIGNMENT_PREFIX})(?![\"'\x60])(?P<value>[^\s,}}\]\x60;|&()<>]+)",
         r"\g<prefix>[REDACTED]",
         text,
         flags=re.IGNORECASE | re.MULTILINE,
@@ -93,6 +102,13 @@ def redact_secrets(text: str) -> str:
         text,
         flags=re.DOTALL,
     )
+    for match in re.finditer(rf"(?im){ASSIGNMENT_PREFIX}(?P<value>[^\r\n]*)", text):
+        if "[REDACTED]" not in match.group("value"):
+            raise ValueError("秘密値を完全に伏字化できないため保存を中止しました")
+    if re.search(r"(?i)\bBearer\s+(?!\[REDACTED\])\S+", text):
+        raise ValueError("秘密値を完全に伏字化できないため保存を中止しました")
+    if re.search(r"-----BEGIN [^-]*PRIVATE KEY-----", text):
+        raise ValueError("秘密値を完全に伏字化できないため保存を中止しました")
     return text
 
 
@@ -108,9 +124,14 @@ def default_run_id() -> str:
     return datetime.now(ZoneInfo("Asia/Tokyo")).strftime("%Y%m%d_%H%M%S")
 
 
-def canonicalize_path(path: Path) -> Path:
-    """macOSの /tmp と /var aliasを含め、ユーザー入力パスを先に正規化する。"""
-    return Path(path).resolve(strict=False)
+def lexical_abspath(path: Path) -> Path:
+    """symlinkを解決せず絶対化し、Darwin標準aliasだけを実体側へ写す。"""
+    absolute = Path(os.path.abspath(os.fspath(path)))
+    if sys.platform == "darwin":
+        parts = absolute.parts
+        if len(parts) >= 2 and parts[1] in ("tmp", "var"):
+            absolute = Path("/private").joinpath(*parts[1:])
+    return absolute
 
 
 def validate_run_id(run_id: str) -> str:
@@ -129,7 +150,7 @@ def validate_run_id(run_id: str) -> str:
 def run_directory(output_root: Path, target: str, run_id: str) -> Path:
     run_id = validate_run_id(run_id)
     run_name = run_id if run_id.startswith("run_") else f"run_{run_id}"
-    return canonicalize_path(output_root) / slugify_target(target) / run_name
+    return lexical_abspath(output_root) / slugify_target(target) / run_name
 
 
 def directory_open_flags() -> int:
@@ -160,7 +181,7 @@ def open_child_directory(parent_fd: int, name: str, *, create: bool) -> int:
 
 def open_directory_path(path: Path, *, create: bool) -> int:
     """絶対/相対パスをcomponentごとにfdで辿り、祖先symlinkを拒否する。"""
-    directory_path = canonicalize_path(path)
+    directory_path = lexical_abspath(path)
     if directory_path.is_absolute():
         current_fd = os.open("/", directory_open_flags())
         components = directory_path.parts[1:]
@@ -241,58 +262,11 @@ def reserve_run_directory(parent_fd: int, final_name: str) -> int:
     try:
         run_fd = os.open(final_name, directory_open_flags(), dir_fd=parent_fd)
     except BaseException:
-        if entry_matches_stat(parent_fd, final_name, created_stat):
-            os.rmdir(final_name, dir_fd=parent_fd)
         raise
     if os.fstat(run_fd).st_ino != created_stat.st_ino or os.fstat(run_fd).st_dev != created_stat.st_dev:
         os.close(run_fd)
         raise OSError(errno.EAGAIN, "runディレクトリが予約後に差し替えられました")
     return run_fd
-
-
-def entry_matches_stat(parent_fd: int, name: str, expected: os.stat_result) -> bool:
-    """親fd直下の名前が、予約済みfdと同じentryを指す場合だけ真を返す。"""
-    try:
-        current = os.lstat(name, dir_fd=parent_fd)
-    except FileNotFoundError:
-        return False
-    return current.st_dev == expected.st_dev and current.st_ino == expected.st_ino
-
-
-def remove_tree_contents_at(directory_fd: int) -> None:
-    """Python 3.9でも使えるfd相対の再帰cleanup。symlinkは辿らずunlinkする。"""
-    for name in os.listdir(directory_fd):
-        entry = os.lstat(name, dir_fd=directory_fd)
-        if stat.S_ISDIR(entry.st_mode):
-            child_fd = os.open(name, directory_open_flags(), dir_fd=directory_fd)
-            try:
-                remove_tree_contents_at(child_fd)
-            finally:
-                os.close(child_fd)
-            os.rmdir(name, dir_fd=directory_fd)
-        else:
-            os.unlink(name, dir_fd=directory_fd)
-
-
-def cleanup_reserved_run(parent_fd: int, final_name: str, run_fd: int, expected: os.stat_result) -> bool:
-    """予約runだけをfd基準で掃除し、同名に差し替わった競合物は残す。"""
-    if not entry_matches_stat(parent_fd, final_name, expected):
-        return False
-    remove_tree_contents_at(run_fd)
-    if not entry_matches_stat(parent_fd, final_name, expected):
-        return False
-    os.rmdir(final_name, dir_fd=parent_fd)
-    return True
-
-
-def cleanup_explicit_output_file(
-    parent_fd: int, final_name: str, expected: os.stat_result
-) -> bool:
-    """予約済みexplicit fileだけを削除し、差し替わった同名entryは残す。"""
-    if not entry_matches_stat(parent_fd, final_name, expected):
-        return False
-    os.unlink(final_name, dir_fd=parent_fd)
-    return True
 
 
 def skill_version() -> str:
@@ -342,7 +316,26 @@ def write_markdown_report(
     if mode_key not in REPORT_FILENAMES:
         raise ValueError(f"未対応の出力モードです: {mode}")
 
-    canonical_output_root = canonicalize_path(output_root)
+    redacted_content = redact_secrets(content)
+    metadata = {
+        "interface_version": INTERFACE_VERSION,
+        "skill": "code-understanding-pro",
+        "skill_version": skill_version(),
+        "mode": DISPLAY_MODES[mode_key],
+        "adapter": adapter,
+        "audience": audience,
+        "target": target,
+        "report_file": REPORT_FILENAMES[mode_key],
+        "generated_at": datetime.now(ZoneInfo("Asia/Tokyo")).isoformat(),
+    }
+    metadata_text = json.dumps(metadata, ensure_ascii=False, indent=2) + "\n"
+    source_manifest = {
+        "interface_version": INTERFACE_VERSION,
+        "sources": [source_entry(source) for source in sources or []],
+    }
+    source_manifest_text = json.dumps(source_manifest, ensure_ascii=False, indent=2) + "\n"
+
+    canonical_output_root = lexical_abspath(output_root)
     run_dir = run_directory(canonical_output_root, target, run_id or default_run_id())
     output_root_fd = open_directory_path(canonical_output_root, create=True)
     try:
@@ -350,44 +343,15 @@ def write_markdown_report(
         try:
             # 最終run名を先に予約して直接書くため、成功前には部分runが一時的に見える。
             run_fd = reserve_run_directory(target_fd, run_dir.name)
-            reserved_stat = os.fstat(run_fd)
             report_file = REPORT_FILENAMES[mode_key]
             try:
-                write_file_at(run_fd, report_file, redact_secrets(content))
-                metadata = {
-                    "interface_version": INTERFACE_VERSION,
-                    "skill": "code-understanding-pro",
-                    "skill_version": skill_version(),
-                    "mode": DISPLAY_MODES[mode_key],
-                    "adapter": adapter,
-                    "audience": audience,
-                    "target": target,
-                    "report_file": report_file,
-                    "generated_at": datetime.now(ZoneInfo("Asia/Tokyo")).isoformat(),
-                }
-                write_file_at(
-                    run_fd,
-                    "run_meta.json",
-                    json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
-                )
-                source_manifest = {
-                    "interface_version": INTERFACE_VERSION,
-                    "sources": [source_entry(source) for source in sources or []],
-                }
-                write_file_at(
-                    run_fd,
-                    "source_manifest.json",
-                    json.dumps(source_manifest, ensure_ascii=False, indent=2) + "\n",
-                )
+                write_file_at(run_fd, ".incomplete", "report generation in progress\n")
+                write_file_at(run_fd, report_file, redacted_content)
+                write_file_at(run_fd, "run_meta.json", metadata_text)
+                write_file_at(run_fd, "source_manifest.json", source_manifest_text)
+                os.unlink(".incomplete", dir_fd=run_fd)
                 fsync_directory(run_fd)
                 fsync_directory(target_fd)
-            except BaseException:
-                cleanup_reserved_run(target_fd, run_dir.name, run_fd, reserved_stat)
-                try:
-                    fsync_directory(target_fd)
-                except OSError:
-                    pass
-                raise
             finally:
                 os.close(run_fd)
         finally:
@@ -399,30 +363,19 @@ def write_markdown_report(
 
 def write_explicit_report(content: str, output_path: Path) -> Path:
     """後方互換用に、最終名を排他的に予約して指定ファイルへ保存する。"""
-    try:
-        original_entry = os.lstat(output_path)
-    except FileNotFoundError:
-        original_entry = None
-    if original_entry is not None and stat.S_ISLNK(original_entry.st_mode):
-        raise FileExistsError(f"出力ファイルが既に存在します（上書きしません）: {output_path.name}")
-    canonical_output_path = canonicalize_path(output_path)
+    redacted_content = redact_secrets(content)
+    canonical_output_path = lexical_abspath(output_path)
     parent_fd = open_directory_path(canonical_output_path.parent, create=True)
     try:
         output_fd = reserve_explicit_output_file(parent_fd, canonical_output_path.name)
-        reserved_stat = os.fstat(output_fd)
         try:
-            try:
-                write_text_to_fd(output_fd, redact_secrets(content), fsync=True)
-            finally:
-                os.close(output_fd)
+            write_text_to_fd(output_fd, redacted_content, fsync=True)
+        finally:
+            os.close(output_fd)
+        try:
             fsync_directory(parent_fd)
-        except BaseException:
-            cleanup_explicit_output_file(parent_fd, canonical_output_path.name, reserved_stat)
-            try:
-                fsync_directory(parent_fd)
-            except OSError:
-                pass
-            raise
+        except OSError:
+            pass
     finally:
         os.close(parent_fd)
     return canonical_output_path

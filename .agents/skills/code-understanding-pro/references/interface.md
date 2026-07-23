@@ -23,7 +23,9 @@ skill_out/code_understanding/<target>/run_<id>/
 
 Quick Modeはチャットのみで完結する。Full、Review、Documentation、Refactoringは上記3ファイルを必須とする。
 
-最終run名を排他的に予約してから3ファイルを直接書き込む。そのため成功前には部分的なrunが一時的に見えることがある。失敗時は予約した同一inodeだけをfd基準でcleanupし、同名に差し替えられた競合物は削除しない。
+最終run名を排他的に予約してから3ファイルを直接書き込む。そのため成功前には部分的なrunが見えることがある。生成中は `.incomplete` を置き、成功時だけ削除する。例外、プロセス強制終了、電源断では `.incomplete` または部分ファイルが残るため、内容確認後に利用者が削除するか、別のrun IDで再実行する。
+
+出力rootは、生成中に他プロセスや他利用者が変更しない信頼済み非共有ディレクトリとする。同一UIDの別プロセスによる能動的な親ディレクトリ差し替えは保護境界外である。
 
 ## Context補助成果物（レポート契約の対象外）
 
@@ -77,7 +79,9 @@ Contextの `source_manifest.json` は、実際に `code_context.md` へ出力さ
 
 ## 機密情報の保存規則
 
-JSON、YAML、通常のenv代入として安全に解析できる秘密値は、周辺構文を維持して `[REDACTED]` に置換する。未閉じ引用符・複数行引用符・ANSI-C引用・command substitution・未引用backslash escapeなどの曖昧な秘密形式は保存を中止し、途中の成果物をcleanupする。これは曖昧な構文を推測して保存しないためのfail-closed契約である。
+JSON、YAML、通常のenv代入として安全に解析できる秘密値は、周辺構文を維持して `[REDACTED]` に置換する。未閉じ引用符、複数行引用符、YAML block scalar、ANSI-C引用、command substitution、未引用backslash escape、引用値の連結などの曖昧な秘密形式は出力予約前に保存を中止する。これは曖昧な構文を推測して保存しないためのfail-closed契約である。
+
+I/O失敗時の自動cleanupは、同名へ差し替えられた競合物を誤削除し得るため行わない。`.incomplete` または部分的な明示出力を利用者が確認して削除する。
 
 ## 完了条件
 

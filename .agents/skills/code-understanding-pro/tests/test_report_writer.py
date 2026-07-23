@@ -245,7 +245,7 @@ def test_write_explicit_report_redacts_shell_values_without_consuming_delimiters
         assert secret not in saved
 
 
-def test_write_report_rejects_ambiguous_secret_syntax_and_cleans_run(tmp_path: Path) -> None:
+def test_write_report_rejects_ambiguous_secret_syntax_before_reserving_run(tmp_path: Path) -> None:
     writer = load_writer_module()
     output_root = tmp_path / "out"
     ambiguous_contents = (
@@ -273,13 +273,37 @@ def test_write_report_rejects_ambiguous_secret_syntax_and_cleans_run(tmp_path: P
         assert not (output_root / "source" / f"run_ambiguous-{index}").exists()
 
 
-def test_path_canonicalization_resolves_tmp_aliases_before_fd_walk() -> None:
+def test_path_normalization_rewrites_only_standard_darwin_aliases() -> None:
     writer = load_writer_module()
-    assert callable(getattr(writer, "canonicalize_path", None))
+    assert callable(getattr(writer, "lexical_abspath", None))
 
-    assert writer.canonicalize_path(Path("/tmp/code-understanding")) == Path("/private/tmp/code-understanding")
+    expected_tmp = Path("/private/tmp/code-understanding") if sys.platform == "darwin" else Path("/tmp/code-understanding")
+    assert writer.lexical_abspath(Path("/tmp/code-understanding")) == expected_tmp
     tempfile_path = Path(tempfile.gettempdir()) / "code-understanding"
-    assert writer.canonicalize_path(tempfile_path) == tempfile_path.resolve(strict=False)
+    assert writer.lexical_abspath(tempfile_path).is_absolute()
+
+
+def test_write_report_rejects_arbitrary_output_root_symlink(tmp_path: Path) -> None:
+    writer = load_writer_module()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    output_root = tmp_path / "linked-output"
+    output_root.symlink_to(outside, target_is_directory=True)
+
+    try:
+        writer.write_markdown_report(
+            "# report\n",
+            mode="full",
+            target="src/source.py",
+            output_root=output_root,
+            run_id="symlink-root",
+        )
+    except ValueError as error:
+        assert "symlink" in str(error)
+    else:
+        raise AssertionError("任意の出力root symlinkを拒否しなければなりません")
+
+    assert not (outside / "source" / "run_symlink-root").exists()
 
 
 def test_write_report_rejects_unsafe_run_ids(tmp_path: Path) -> None:
@@ -333,7 +357,7 @@ def test_write_report_rejects_resolved_output_outside_target_directory(tmp_path:
     assert not (outside / "run_containment").exists()
 
 
-def test_write_report_cleans_reserved_run_after_failure_and_allows_retry(tmp_path: Path) -> None:
+def test_write_report_keeps_incomplete_marker_after_write_failure_and_rejects_reuse(tmp_path: Path) -> None:
     writer = load_writer_module()
     assert callable(getattr(writer, "reserve_run_directory", None))
     output_root = tmp_path / "out"
@@ -365,20 +389,24 @@ def test_write_report_cleans_reserved_run_after_failure_and_allows_retry(tmp_pat
         failing_patch.undo()
 
     run_dir = output_root / "source" / "run_retry"
-    assert not run_dir.exists()
+    assert (run_dir / ".incomplete").exists()
+    assert (run_dir / "report.md").read_text(encoding="utf-8") == "# report\n"
 
-    report_path = writer.write_markdown_report(
-        "# report\n",
-        mode="full",
-        target="src/source.py",
-        output_root=output_root,
-        run_id="retry",
-    )
-    assert report_path == run_dir / "report.md"
-    assert report_path.read_text(encoding="utf-8") == "# report\n"
+    try:
+        writer.write_markdown_report(
+            "# report\n",
+            mode="full",
+            target="src/source.py",
+            output_root=output_root,
+            run_id="retry",
+        )
+    except FileExistsError:
+        pass
+    else:
+        raise AssertionError("失敗後に残ったrun-idの再利用を拒否しなければなりません")
 
 
-def test_write_report_keeps_replaced_competing_run_during_failure_cleanup(tmp_path: Path) -> None:
+def test_write_report_does_not_delete_replaced_competing_run_after_failure(tmp_path: Path) -> None:
     writer = load_writer_module()
     assert callable(getattr(writer, "reserve_run_directory", None))
     output_root = tmp_path / "out"
@@ -531,7 +559,7 @@ def test_write_explicit_report_rejects_existing_file_directory_and_dangling_syml
     assert not outside.exists()
 
 
-def test_write_explicit_report_cleans_reserved_name_after_write_failure(tmp_path: Path) -> None:
+def test_write_explicit_report_keeps_partial_file_after_write_failure(tmp_path: Path) -> None:
     writer = load_writer_module()
     output_path = tmp_path / "output" / "explicit.md"
     output_path.parent.mkdir()
@@ -555,7 +583,15 @@ def test_write_explicit_report_cleans_reserved_name_after_write_failure(tmp_path
     finally:
         failure_patch.undo()
 
-    assert not output_path.exists()
+    assert output_path.exists()
+    assert output_path.read_text(encoding="utf-8") == ""
+
+    try:
+        writer.write_explicit_report("# retry\n", output_path)
+    except FileExistsError:
+        pass
+    else:
+        raise AssertionError("部分explicit出力と同名の再利用を拒否しなければなりません")
 
 
 def test_write_explicit_report_keeps_replaced_competitor_during_failure_cleanup(tmp_path: Path) -> None:
@@ -749,3 +785,99 @@ def test_secret_contract_documents_ambiguous_syntax_abort() -> None:
     for document in (interface, skill):
         assert "曖昧な秘密形式" in document
         assert "保存を中止" in document
+
+
+def test_write_report_rejects_extended_ambiguous_secret_forms_before_reserving_run(tmp_path: Path) -> None:
+    writer = load_writer_module()
+    output_root = tmp_path / "out"
+    ambiguous_contents = (
+        "client_secret: |\n  multiline-secret",
+        "client_secret: >\n  folded-secret",
+        'TOKEN="first""second"',
+        "-----BEGIN PRIVATE KEY-----\nprivate-material",
+    )
+
+    for index, content in enumerate(ambiguous_contents):
+        try:
+            writer.write_markdown_report(
+                content,
+                mode="full",
+                target="src/source.py",
+                output_root=output_root,
+                run_id=f"extended-ambiguous-{index}",
+            )
+        except ValueError as error:
+            assert "曖昧" in str(error) or "伏字" in str(error)
+        else:
+            raise AssertionError(f"安全に伏字化できない形式を拒否しなければなりません: {content!r}")
+
+        assert not (output_root / "source" / f"run_extended-ambiguous-{index}").exists()
+
+
+def test_write_report_prepares_source_hash_before_reserving_run(tmp_path: Path) -> None:
+    writer = load_writer_module()
+    output_root = tmp_path / "out"
+
+    def fail_source_entry(source: str) -> dict[str, object]:
+        del source
+        raise OSError("source hash failed")
+
+    from pytest import MonkeyPatch
+
+    hash_patch = MonkeyPatch()
+    hash_patch.setattr(writer, "source_entry", fail_source_entry)
+    hash_patch.setattr(
+        writer,
+        "reserve_run_directory",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("runを予約してはなりません")),
+    )
+    try:
+        try:
+            writer.write_markdown_report(
+                "# report\n",
+                mode="full",
+                target="src/source.py",
+                output_root=output_root,
+                run_id="hash-failure",
+                sources=["src/source.py"],
+            )
+        except OSError as error:
+            assert "source hash failed" in str(error)
+        else:
+            raise AssertionError("source hash失敗を呼び出し元へ伝播しなければなりません")
+    finally:
+        hash_patch.undo()
+
+    assert not (output_root / "source" / "run_hash-failure").exists()
+
+
+def test_successful_run_removes_incomplete_marker(tmp_path: Path) -> None:
+    writer = load_writer_module()
+    report_path = writer.write_markdown_report(
+        "# report\n",
+        mode="full",
+        target="src/source.py",
+        output_root=tmp_path / "out",
+        run_id="complete",
+    )
+
+    assert report_path.exists()
+    assert not (report_path.parent / ".incomplete").exists()
+
+
+def test_writer_has_no_automatic_recursive_cleanup_helpers() -> None:
+    writer = load_writer_module()
+
+    for name in ("remove_tree_contents_at", "cleanup_reserved_run", "cleanup_explicit_output_file"):
+        assert not hasattr(writer, name)
+
+
+def test_output_contract_documents_incomplete_artifacts_and_trust_boundary() -> None:
+    interface = (SKILL_DIR / "references" / "interface.md").read_text(encoding="utf-8")
+    skill = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+
+    for document in (interface, skill):
+        assert ".incomplete" in document
+        assert "利用者が削除" in document
+        assert "信頼済み非共有ディレクトリ" in document
+        assert "同一UID" in document
