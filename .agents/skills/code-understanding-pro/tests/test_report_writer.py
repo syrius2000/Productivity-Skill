@@ -5,6 +5,7 @@ import importlib.util
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -225,7 +226,6 @@ def test_write_explicit_report_redacts_shell_values_without_consuming_delimiters
                 "export API_KEY=comment-secret # keep this comment",
                 "TOKEN=secret#suffix",
                 "TOKEN=secret # separate comment",
-                "TOKEN=`unterminated-secret",
             )
         )
         + "\n",
@@ -239,11 +239,47 @@ def test_write_explicit_report_redacts_shell_values_without_consuming_delimiters
         "export API_KEY=[REDACTED] # keep this comment",
         "TOKEN=[REDACTED]",
         "TOKEN=[REDACTED] # separate comment",
-        "TOKEN=`[REDACTED]",
     ]
     saved = "\n".join(saved_lines)
-    for secret in ("backtick-secret", "plain-secret", "comment-secret", "secret", "suffix", "unterminated"):
+    for secret in ("backtick-secret", "plain-secret", "comment-secret", "secret", "suffix"):
         assert secret not in saved
+
+
+def test_write_report_rejects_ambiguous_secret_syntax_and_cleans_run(tmp_path: Path) -> None:
+    writer = load_writer_module()
+    output_root = tmp_path / "out"
+    ambiguous_contents = (
+        'TOKEN="unterminated',
+        'TOKEN="first\nsecond"',
+        "TOKEN=$'ansi-secret'",
+        "TOKEN=$(read_secret)",
+        r"TOKEN=secret\ value",
+    )
+
+    for index, content in enumerate(ambiguous_contents):
+        try:
+            writer.write_markdown_report(
+                content,
+                mode="full",
+                target="src/source.py",
+                output_root=output_root,
+                run_id=f"ambiguous-{index}",
+            )
+        except ValueError as error:
+            assert "曖昧" in str(error)
+        else:
+            raise AssertionError(f"曖昧な秘密形式を拒否しなければなりません: {content!r}")
+
+        assert not (output_root / "source" / f"run_ambiguous-{index}").exists()
+
+
+def test_path_canonicalization_resolves_tmp_aliases_before_fd_walk() -> None:
+    writer = load_writer_module()
+    assert callable(getattr(writer, "canonicalize_path", None))
+
+    assert writer.canonicalize_path(Path("/tmp/code-understanding")) == Path("/private/tmp/code-understanding")
+    tempfile_path = Path(tempfile.gettempdir()) / "code-understanding"
+    assert writer.canonicalize_path(tempfile_path) == tempfile_path.resolve(strict=False)
 
 
 def test_write_report_rejects_unsafe_run_ids(tmp_path: Path) -> None:
@@ -297,8 +333,9 @@ def test_write_report_rejects_resolved_output_outside_target_directory(tmp_path:
     assert not (outside / "run_containment").exists()
 
 
-def test_write_report_cleans_staging_directory_after_failure_and_allows_retry(tmp_path: Path) -> None:
+def test_write_report_cleans_reserved_run_after_failure_and_allows_retry(tmp_path: Path) -> None:
     writer = load_writer_module()
+    assert callable(getattr(writer, "reserve_run_directory", None))
     output_root = tmp_path / "out"
     original_os_write = os.write
 
@@ -329,7 +366,6 @@ def test_write_report_cleans_staging_directory_after_failure_and_allows_retry(tm
 
     run_dir = output_root / "source" / "run_retry"
     assert not run_dir.exists()
-    assert not list((output_root / "source").glob(".run_retry.tmp-*"))
 
     report_path = writer.write_markdown_report(
         "# report\n",
@@ -342,40 +378,42 @@ def test_write_report_cleans_staging_directory_after_failure_and_allows_retry(tm
     assert report_path.read_text(encoding="utf-8") == "# report\n"
 
 
-def test_write_report_preserves_competing_run_and_cleans_staging_directory(tmp_path: Path) -> None:
+def test_write_report_keeps_replaced_competing_run_during_failure_cleanup(tmp_path: Path) -> None:
     writer = load_writer_module()
-    assert callable(getattr(writer, "publish_staging", None))
+    assert callable(getattr(writer, "reserve_run_directory", None))
     output_root = tmp_path / "out"
     target_dir = output_root / "source"
     target_dir.mkdir(parents=True)
-    real_publish = writer.publish_staging
+    real_reserve = writer.reserve_run_directory
 
-    def publish_after_competitor(parent_fd: int, staging_name: str, final_name: str) -> None:
+    def reserve_then_replace(parent_fd: int, final_name: str) -> int:
+        run_fd = real_reserve(parent_fd, final_name)
+        os.rename(final_name, f"{final_name}.original", src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
         os.mkdir(final_name, dir_fd=parent_fd)
-        final_fd = os.open(
+        competitor_fd = os.open(
             final_name,
             os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
             dir_fd=parent_fd,
         )
         try:
-            report_fd = os.open(
-                "report.md",
-                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
-                0o600,
-                dir_fd=final_fd,
-            )
+            report_fd = os.open("report.md", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=competitor_fd)
             try:
                 os.write(report_fd, b"incumbent\n")
             finally:
                 os.close(report_fd)
         finally:
-            os.close(final_fd)
-        real_publish(parent_fd, staging_name, final_name)
+            os.close(competitor_fd)
+        return run_fd
+
+    def fail_file_write(directory_fd: int, filename: str, text: str) -> None:
+        del directory_fd, filename, text
+        raise OSError("write failed")
 
     from pytest import MonkeyPatch
 
     collision_patch = MonkeyPatch()
-    collision_patch.setattr(writer, "publish_staging", publish_after_competitor)
+    collision_patch.setattr(writer, "reserve_run_directory", reserve_then_replace)
+    collision_patch.setattr(writer, "write_file_at", fail_file_write)
     try:
         try:
             writer.write_markdown_report(
@@ -385,16 +423,16 @@ def test_write_report_preserves_competing_run_and_cleans_staging_directory(tmp_p
                 output_root=output_root,
                 run_id="collision",
             )
-        except FileExistsError:
-            pass
+        except OSError as error:
+            assert "write failed" in str(error)
         else:
-            raise AssertionError("競合runがある場合はpublishに失敗しなければなりません")
+            raise AssertionError("書込み失敗は呼び出し元へ伝播しなければなりません")
     finally:
         collision_patch.undo()
 
     run_dir = target_dir / "run_collision"
     assert (run_dir / "report.md").read_text(encoding="utf-8") == "incumbent\n"
-    assert not list(target_dir.glob(".run_collision.tmp-*"))
+    assert (target_dir / "run_collision.original").is_dir()
 
 
 def test_write_report_keeps_writes_inside_opened_ancestor_after_symlink_swap(tmp_path: Path) -> None:
@@ -518,6 +556,45 @@ def test_write_explicit_report_cleans_reserved_name_after_write_failure(tmp_path
         failure_patch.undo()
 
     assert not output_path.exists()
+
+
+def test_write_explicit_report_keeps_replaced_competitor_during_failure_cleanup(tmp_path: Path) -> None:
+    writer = load_writer_module()
+    output_path = tmp_path / "output" / "explicit.md"
+    output_path.parent.mkdir()
+    real_reserve = writer.reserve_explicit_output_file
+
+    def reserve_then_replace(parent_fd: int, final_name: str) -> int:
+        output_fd = real_reserve(parent_fd, final_name)
+        os.rename(final_name, f"{final_name}.original", src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+        competitor_fd = os.open(final_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=parent_fd)
+        try:
+            os.write(competitor_fd, b"incumbent\n")
+        finally:
+            os.close(competitor_fd)
+        return output_fd
+
+    def fail_write(fd: int, text: str, *, fsync: bool = False) -> None:
+        del fd, text, fsync
+        raise OSError("write failed")
+
+    from pytest import MonkeyPatch
+
+    replacement_patch = MonkeyPatch()
+    replacement_patch.setattr(writer, "reserve_explicit_output_file", reserve_then_replace)
+    replacement_patch.setattr(writer, "write_text_to_fd", fail_write)
+    try:
+        try:
+            writer.write_explicit_report("# candidate\n", output_path)
+        except OSError as error:
+            assert "write failed" in str(error)
+        else:
+            raise AssertionError("書込み失敗は呼び出し元へ伝播しなければなりません")
+    finally:
+        replacement_patch.undo()
+
+    assert output_path.read_text(encoding="utf-8") == "incumbent\n"
+    assert (output_path.parent / "explicit.md.original").exists()
 
 
 def test_write_explicit_report_keeps_writes_inside_opened_parent_after_symlink_swap(tmp_path: Path) -> None:
@@ -663,3 +740,12 @@ def test_interface_documents_context_metadata_contract() -> None:
     assert "`code_context.md`" in interface
     assert "mode=Context" in interface
     assert "report_file=code_context.md" in interface
+
+
+def test_secret_contract_documents_ambiguous_syntax_abort() -> None:
+    interface = (SKILL_DIR / "references" / "interface.md").read_text(encoding="utf-8")
+    skill = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+
+    for document in (interface, skill):
+        assert "曖昧な秘密形式" in document
+        assert "保存を中止" in document

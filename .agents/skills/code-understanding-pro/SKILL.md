@@ -367,6 +367,7 @@ skill_out/code_understanding/<target>/run_<id>/
 `run_meta.json` には契約版、モード、アダプター、読者、対象、Skill版、生成時刻を記録する。`source_manifest.json` には根拠ソースのパス、存在状態、サイズ、SHA-256を記録し、ソース本文は複製しない。
 
 同一のrunディレクトリが既に存在する場合は上書きしない。再実行時は別の `--run-id` を指定する。
+最終run名を排他的に予約してから3ファイルを直接書き込むため、成功前には部分的なrunが一時的に見えることがある。失敗時は予約した同一inodeだけをfd基準でcleanupし、同名へ差し替えられた競合物は削除しない。
 
 ## 保存手順
 
@@ -413,6 +414,7 @@ python3 .agents/skills/code-understanding-pro/scripts/collect_code_context.py sr
 ## 機密情報と失敗時の扱い
 
 - APIキー、パスワード、シークレット、Bearerトークン、秘密鍵は保存前に `[REDACTED]` へ置換する。
+- JSON、YAML、通常のenv代入として安全に解析できる値は周辺構文を保って伏字化する。未閉じ引用符・複数行引用符・ANSI-C引用・command substitution・未引用backslash escapeなどの曖昧な秘密形式は保存を中止し、途中の成果物をcleanupする。
 - 入力コードや解析結果に個人情報が含まれる場合は、保存前に対象を確認し、必要に応じて匿名化する。
 - 保存に失敗した場合は、チャットに失敗理由を示し、未保存の本文を必要最小限だけ返す。
 - Quick ModeをMarkdown保存CLIへ渡してはならない。Quick Modeはチャット回答として完結させる。

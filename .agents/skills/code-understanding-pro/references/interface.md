@@ -23,6 +23,8 @@ skill_out/code_understanding/<target>/run_<id>/
 
 Quick Modeはチャットのみで完結する。Full、Review、Documentation、Refactoringは上記3ファイルを必須とする。
 
+最終run名を排他的に予約してから3ファイルを直接書き込む。そのため成功前には部分的なrunが一時的に見えることがある。失敗時は予約した同一inodeだけをfd基準でcleanupし、同名に差し替えられた競合物は削除しない。
+
 ## Context補助成果物（レポート契約の対象外）
 
 `collect_code_context.py --output-root` は、解析済みレポートではなく、親Skillを補助するContext成果物を保存する。
@@ -72,6 +74,10 @@ Contextの `source_manifest.json` は、実際に `code_context.md` へ出力さ
 `sql` アダプターは、データ粒度、テーブル・CTE一覧、JOINと行数変化、検証SQLも必須とする。
 
 `stats` アダプターは、対象母集団、欠測・除外、推定量・前提、バイアスと妥当性、再現・検証コードも必須とする。
+
+## 機密情報の保存規則
+
+JSON、YAML、通常のenv代入として安全に解析できる秘密値は、周辺構文を維持して `[REDACTED]` に置換する。未閉じ引用符・複数行引用符・ANSI-C引用・command substitution・未引用backslash escapeなどの曖昧な秘密形式は保存を中止し、途中の成果物をcleanupする。これは曖昧な構文を推測して保存しないためのfail-closed契約である。
 
 ## 完了条件
 
