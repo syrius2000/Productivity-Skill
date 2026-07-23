@@ -213,6 +213,33 @@ def test_write_report_redacts_escaped_quoted_secret_values_without_breaking_synt
         assert fragment not in saved
 
 
+def test_write_explicit_report_redacts_shell_values_without_consuming_delimiters(tmp_path: Path) -> None:
+    writer = load_writer_module()
+    output_path = tmp_path / "explicit.md"
+
+    writer.write_explicit_report(
+        "\n".join(
+            (
+                "TOKEN=`backtick-secret`; echo ok # backtick comment",
+                "TOKEN=plain-secret; echo ok # plain comment",
+                "export API_KEY=comment-secret # keep this comment",
+            )
+        )
+        + "\n",
+        output_path,
+    )
+
+    saved_lines = output_path.read_text(encoding="utf-8").splitlines()
+    assert saved_lines == [
+        "TOKEN=`[REDACTED]`; echo ok # backtick comment",
+        "TOKEN=[REDACTED]; echo ok # plain comment",
+        "export API_KEY=[REDACTED] # keep this comment",
+    ]
+    saved = "\n".join(saved_lines)
+    for secret in ("backtick-secret", "plain-secret", "comment-secret"):
+        assert secret not in saved
+
+
 def test_write_report_rejects_unsafe_run_ids(tmp_path: Path) -> None:
     content_path = tmp_path / "content.md"
     content_path.write_text("# report\n", encoding="utf-8")
@@ -398,6 +425,76 @@ def test_write_report_keeps_staging_writes_inside_opened_parent_after_symlink_sw
 
     assert not (outside / "run_symlink-swap").exists()
     assert (moved_parent / "run_symlink-swap" / "report.md").read_text(encoding="utf-8") == "# report\n"
+
+
+def test_write_explicit_report_preserves_competing_file_and_cleans_staging_file(tmp_path: Path) -> None:
+    writer = load_writer_module()
+    assert callable(getattr(writer, "create_explicit_staging_file", None))
+    output_path = tmp_path / "output" / "explicit.md"
+    output_path.parent.mkdir()
+    real_create_staging = writer.create_explicit_staging_file
+
+    def create_staging_then_compete(parent_fd: int, final_name: str) -> tuple[str, int]:
+        staging_name, staging_fd = real_create_staging(parent_fd, final_name)
+        competing_fd = os.open(
+            final_name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+            0o600,
+            dir_fd=parent_fd,
+        )
+        try:
+            os.write(competing_fd, b"incumbent\n")
+        finally:
+            os.close(competing_fd)
+        return staging_name, staging_fd
+
+    from pytest import MonkeyPatch
+
+    collision_patch = MonkeyPatch()
+    collision_patch.setattr(writer, "create_explicit_staging_file", create_staging_then_compete)
+    try:
+        try:
+            writer.write_explicit_report("# candidate\n", output_path)
+        except FileExistsError:
+            pass
+        else:
+            raise AssertionError("競合ファイルがある場合はpublishに失敗しなければなりません")
+    finally:
+        collision_patch.undo()
+
+    assert output_path.read_text(encoding="utf-8") == "incumbent\n"
+    assert not list(output_path.parent.glob(".explicit.md.tmp-*"))
+
+
+def test_write_explicit_report_keeps_writes_inside_opened_parent_after_symlink_swap(tmp_path: Path) -> None:
+    writer = load_writer_module()
+    assert callable(getattr(writer, "create_explicit_staging_file", None))
+    parent_dir = tmp_path / "output"
+    parent_dir.mkdir()
+    output_path = parent_dir / "explicit.md"
+    moved_parent = tmp_path / "moved-output"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    real_create_staging = writer.create_explicit_staging_file
+
+    def create_staging_then_swap(parent_fd: int, final_name: str) -> tuple[str, int]:
+        staging_name, staging_fd = real_create_staging(parent_fd, final_name)
+        parent_dir.rename(moved_parent)
+        parent_dir.symlink_to(outside, target_is_directory=True)
+        return staging_name, staging_fd
+
+    from pytest import MonkeyPatch
+
+    swap_patch = MonkeyPatch()
+    swap_patch.setattr(writer, "create_explicit_staging_file", create_staging_then_swap)
+    try:
+        writer.write_explicit_report("# explicit\n", output_path)
+    finally:
+        swap_patch.undo()
+
+    assert not (outside / "explicit.md").exists()
+    assert (moved_parent / "explicit.md").read_text(encoding="utf-8") == "# explicit\n"
+    assert not list(moved_parent.glob(".explicit.md.tmp-*"))
 
 
 def test_write_report_rejects_quick_mode(tmp_path: Path) -> None:

@@ -58,7 +58,13 @@ def redact_secrets(text: str) -> str:
         flags=re.IGNORECASE | re.MULTILINE,
     )
     text = re.sub(
-        rf"(?P<prefix>{assignment_prefix})(?![\"'])(?P<value>[^\s,}}\]`]+)",
+        rf"(?P<prefix>{assignment_prefix})(?P<quote>\x60)(?P<value>(?:\\.|[^\x60\\\r\n])*)(?P=quote)",
+        replace_quoted,
+        text,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+    text = re.sub(
+        rf"(?P<prefix>{assignment_prefix})(?![\"'\x60])(?P<value>[^\s,}}\]\x60;#]+)",
         r"\g<prefix>[REDACTED]",
         text,
         flags=re.IGNORECASE | re.MULTILINE,
@@ -140,6 +146,19 @@ def create_staging_directory(parent_fd: int, run_name: str) -> str:
     raise FileExistsError("stagingディレクトリ名を安全に確保できません")
 
 
+def write_text_to_fd(fd: int, text: str, *, fsync: bool = False) -> None:
+    """開かれたfdへ全量を書き込み、必要時は内容を同期する。"""
+    data = text.encode("utf-8")
+    offset = 0
+    while offset < len(data):
+        written = os.write(fd, data[offset:])
+        if written <= 0:
+            raise OSError(errno.EIO, "成果物を書き込めません")
+        offset += written
+    if fsync:
+        os.fsync(fd)
+
+
 def write_file_at(directory_fd: int, filename: str, text: str) -> None:
     """固定済みのディレクトリfd配下へ新規ファイルを安全に書き込む。"""
     fd = os.open(
@@ -149,15 +168,48 @@ def write_file_at(directory_fd: int, filename: str, text: str) -> None:
         dir_fd=directory_fd,
     )
     try:
-        data = text.encode("utf-8")
-        offset = 0
-        while offset < len(data):
-            written = os.write(fd, data[offset:])
-            if written <= 0:
-                raise OSError(errno.EIO, f"成果物を書き込めません: {filename}")
-            offset += written
+        write_text_to_fd(fd, text)
     finally:
         os.close(fd)
+
+
+def create_explicit_staging_file(parent_fd: int, final_name: str) -> tuple[str, int]:
+    """固定済みの親fd配下に、explicit保存用の一時ファイルを排他的に作成する。"""
+    for _ in range(100):
+        staging_name = f".{final_name}.tmp-{secrets.token_hex(16)}"
+        try:
+            staging_fd = os.open(
+                staging_name,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                0o600,
+                dir_fd=parent_fd,
+            )
+        except FileExistsError:
+            continue
+        return staging_name, staging_fd
+    raise FileExistsError("explicit保存用の一時ファイル名を安全に確保できません")
+
+
+def publish_explicit_staging_file(parent_fd: int, staging_name: str, final_name: str) -> None:
+    """hard linkで最終名を排他的に公開し、既存entryは一切上書きしない。"""
+    try:
+        os.link(
+            staging_name,
+            final_name,
+            src_dir_fd=parent_fd,
+            dst_dir_fd=parent_fd,
+            follow_symlinks=False,
+        )
+    except FileExistsError as error:
+        raise FileExistsError(f"出力ファイルが既に存在します（上書きしません）: {final_name}") from error
+
+
+def cleanup_explicit_staging_file(parent_fd: int, staging_name: str) -> None:
+    """固定済みの親fd配下から失敗したexplicit保存用一時ファイルを除去する。"""
+    try:
+        os.unlink(staging_name, dir_fd=parent_fd)
+    except FileNotFoundError:
+        pass
 
 
 def cleanup_staging_directory(parent_fd: int, staging_name: str) -> None:
@@ -309,10 +361,22 @@ def write_markdown_report(
 
 def write_explicit_report(content: str, output_path: Path) -> Path:
     """後方互換用に、指定された単一ファイルへ保存する。"""
-    if output_path.exists():
-        raise FileExistsError(f"出力ファイルが既に存在します（上書きしません）: {output_path}")
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(redact_secrets(content), encoding="utf-8")
+    parent_fd = os.open(output_path.parent, directory_open_flags())
+    try:
+        staging_name, staging_fd = create_explicit_staging_file(parent_fd, output_path.name)
+        try:
+            try:
+                write_text_to_fd(staging_fd, redact_secrets(content), fsync=True)
+            finally:
+                os.close(staging_fd)
+            publish_explicit_staging_file(parent_fd, staging_name, output_path.name)
+        except BaseException:
+            cleanup_explicit_staging_file(parent_fd, staging_name)
+            raise
+        os.unlink(staging_name, dir_fd=parent_fd)
+    finally:
+        os.close(parent_fd)
     return output_path
 
 
