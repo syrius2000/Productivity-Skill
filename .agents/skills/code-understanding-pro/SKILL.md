@@ -404,6 +404,10 @@ python3 .agents/skills/code-understanding-pro/scripts/collect_code_context.py sr
   --run-id context
 ```
 
+`--output-root` は `code_context.md`、`mode: Context` のmetadata、実際に収集した各ファイルの `source_manifest.json` を保存する。これはFull、Review、Documentation、Refactoringの `report.md` 契約を補助するContext成果物であり、収集済み生テキストを通常レポートへ強制してはならない。`code_context.md` は必須見出しを満たす必要がなく、`validate_report.py` の検証CLIの対象外である。
+
+ディレクトリを指定した場合、manifestにはディレクトリ自体ではなく、実際に `code_context.md` へ出力されたファイルを記録する。出力上限で省略されたファイルは記録しない。
+
 単一ファイルへ保存する場合は `--output <path>` を使う。`--output-root` と `--output` を同時に指定した場合は `--output-root` を優先する。
 
 ## 機密情報と失敗時の扱い

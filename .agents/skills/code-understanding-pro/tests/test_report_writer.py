@@ -189,3 +189,40 @@ def test_collect_context_can_write_a_run_isolated_markdown(tmp_path: Path) -> No
     saved = tmp_path / "out" / "source" / "run_context" / "code_context.md"
     assert saved.exists()
     assert "print('hello')" in saved.read_text(encoding="utf-8")
+
+
+def test_collect_context_records_each_included_file_in_context_manifest(tmp_path: Path) -> None:
+    source_dir = tmp_path / "src"
+    source_dir.mkdir()
+    source = source_dir / "source.py"
+    source.write_text("print('hello')\n", encoding="utf-8")
+
+    result = run_cli(
+        COLLECTOR,
+        str(source_dir),
+        "--output-root",
+        str(tmp_path / "out"),
+        "--run-id",
+        "context-manifest",
+    )
+
+    assert result.returncode == 0, result.stderr
+    run_dir = tmp_path / "out" / "src" / "run_context-manifest"
+    assert (run_dir / "code_context.md").exists()
+    metadata = json.loads((run_dir / "run_meta.json").read_text(encoding="utf-8"))
+    assert metadata["mode"] == "Context"
+    manifest = json.loads((run_dir / "source_manifest.json").read_text(encoding="utf-8"))
+    entry = next(item for item in manifest["sources"] if item["path"] == str(source.resolve()))
+    assert entry["exists"] is True
+    assert entry["size_bytes"] == source.stat().st_size
+    assert len(entry["sha256"]) == 64
+
+
+def test_context_artifact_contract_is_documented_as_validator_incompatible() -> None:
+    interface = (SKILL_DIR / "references" / "interface.md").read_text(encoding="utf-8")
+    skill = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+
+    for document in (interface, skill):
+        assert "code_context.md" in document
+        assert "Context" in document
+        assert "検証CLIの対象外" in document

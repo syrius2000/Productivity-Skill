@@ -21,7 +21,22 @@ skill_out/code_understanding/<target>/run_<id>/
 └── source_manifest.json
 ```
 
-Quick Modeはチャットのみで完結する。それ以外のモードは3ファイルを必須とする。
+Quick Modeはチャットのみで完結する。Full、Review、Documentation、Refactoringは上記3ファイルを必須とする。
+
+## Context補助成果物（レポート契約の対象外）
+
+`collect_code_context.py --output-root` は、解析済みレポートではなく、親Skillを補助するContext成果物を保存する。
+
+```text
+skill_out/code_understanding/<target>/run_<id>/
+├── code_context.md
+├── run_meta.json       # mode: Context
+└── source_manifest.json
+```
+
+`code_context.md` は収集した生テキストを含む補助資料であり、Full、Review、Documentation、Refactoringの `report.md` 契約の対象外である。必須見出しを満たすことを要求せず、`validate_report.py` の検証CLIの対象外とする。収集結果をそのまま `report.md` へ強制してはならない。
+
+Contextの `source_manifest.json` は、実際に `code_context.md` へ出力された各ファイルを記録する。ディレクトリ引数は実際に出力されたファイルへ展開し、出力上限などで省略されたファイルやディレクトリ自体は記録しない。
 
 ## `run_meta.json`
 

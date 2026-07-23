@@ -107,13 +107,16 @@ def fenced_language(path: Path) -> str:
     }.get(suffix, "text")
 
 
-def collect_context(paths: list[Path], exts: set[str], excludes: set[str], max_bytes: int) -> str:
+def collect_context(
+    paths: list[Path], exts: set[str], excludes: set[str], max_bytes: int
+) -> tuple[str, list[Path]]:
     blocks = [
         "# Code Context",
         "",
         "このファイルはコード理解用に自動収集されたコンテキストです。機密情報が含まれていないか確認してください。",
         "",
     ]
+    included_files: list[Path] = []
     emitted = sum(len(block.encode("utf-8")) for block in blocks)
     for path in iter_files(paths, exts, excludes):
         text = read_text_safely(path)
@@ -123,8 +126,9 @@ def collect_context(paths: list[Path], exts: set[str], excludes: set[str], max_b
             blocks.append("\n<!-- 出力上限に達したため、以降のファイルは省略しました。 -->")
             break
         blocks.append(block)
+        included_files.append(path)
         emitted += block_size
-    return "\n".join(blocks) + "\n"
+    return "\n".join(blocks) + "\n", included_files
 
 
 def main() -> int:
@@ -142,7 +146,7 @@ def main() -> int:
     excludes = DEFAULT_EXCLUDES | set(args.exclude or [])
     targets = [Path(p).resolve() for p in args.paths]
 
-    content = collect_context(targets, exts, excludes, args.max_bytes)
+    content, included_files = collect_context(targets, exts, excludes, args.max_bytes)
     if args.output_root:
         target = targets[0].name if len(targets) == 1 else "project_context"
         try:
@@ -152,6 +156,7 @@ def main() -> int:
                 target=target,
                 output_root=args.output_root,
                 run_id=args.run_id,
+                sources=[str(path) for path in included_files],
             )
         except (OSError, UnicodeError, ValueError) as error:
             print(f"エラー: {error}", file=sys.stderr)
