@@ -1,8 +1,8 @@
 {
   "name": "code-understanding-pro",
-  "version": "1.2.0-ja",
+  "version": "2.0.0-ja",
   "language": "ja",
-  "description": "既存コードの段階的理解、レビュー、QA、ドキュメント化、リファクタリング支援を行う日本語Skill。",
+  "description": "コード理解スイートの親Skill。汎用、SQL、統計コードの深い解析を共通Markdown成果物へ保存する。",
   "entrypoint": "SKILL.md",
   "modes": [
     "Quick",
@@ -21,6 +21,7 @@
     "assets/docstring-template-python.md",
     "assets/docstring-template-r.md",
     "assets/mermaid-patterns.md",
+    "assets/output-template-beginner.md",
     "assets/output-template-full.md",
     "assets/output-template-quick.md",
     "assets/output-template-refactoring.md",
@@ -29,9 +30,12 @@
     "examples/expected-output-skeleton.md",
     "manifest.json",
     "references/qiita-code-reading-pyramid.md",
+    "references/interface.md",
     "references/refactoring-safety-checklist.md",
     "references/review-severity-guide.md",
     "references/test-first-caveats.md",
-    "scripts/collect_code_context.py"
+    "scripts/collect_code_context.py",
+    "scripts/validate_report.py",
+    "scripts/write_report.py"
   ]
 }

@@ -30,9 +30,9 @@ flowchart TD
 flowchart LR
     S1[(Claims Data)] --> C1[Medication Cohort]
     S2[(Lab Data)] --> C2[Baseline Labs]
-    
+
     C1 --> M[Matched Population]
     C2 --> M
-    
+
     M --> Out[(Final Analytical Dataset)]
 ```

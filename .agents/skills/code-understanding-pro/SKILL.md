@@ -1,7 +1,7 @@
 ---
 name: code-understanding-pro
-description: 既存コードの理解、説明、レビュー、ドキュメント化、リファクタリング支援を行う日本語Skill。ユーザーが「このコードを説明」「レビュー」「QA」「何をしているか」「ロジックを解析」「リファクタリング」「ドキュメント化」と依頼したときに使う。5段階のコード理解ピラミッド（文脈把握、概要理解、詳細追跡、深い設計理解、活用）に従い、事実・推測・不確実性・根拠を分けて出力する。
-version: "1.2.0-ja"
+description: Use when a user asks to understand, review, document, explain, or safely refactor existing code in Japanese.
+version: "2.0.0-ja"
 license: "Internal use"
 ---
 
@@ -41,7 +41,7 @@ license: "Internal use"
 
 ## コア原則
 
-### 1. 理解優先、評価は後
+### 0. 理解優先、評価は後
 
 レビューコメントに飛びつかず、まず以下を確認する。
 
@@ -54,13 +54,13 @@ license: "Internal use"
 
 その後に、品質、リスク、改善案を評価する。
 
-### 2. 対話優先
+### 1. 対話優先
 
 コード理解は一回で完了するとは限らない。ユーザーの追加質問に備え、説明の背景を保持する。
 
 ただし、必要以上に質問で止まらない。十分な文脈があれば、仮定を明示してベストエフォートで進める。
 
-### 3. プロジェクト文脈を優先
+### 2. プロジェクト文脈を優先
 
 一般論より、プロジェクト固有の証拠を優先する。
 
@@ -73,7 +73,7 @@ license: "Internal use"
 5. README、設計メモ、Issue、仕様書
 6. Git履歴、変更理由、PR説明
 
-### 4. テストは意図を示すが、絶対ではない
+### 3. テストは意図を示すが、絶対ではない
 
 テストは開発者の意図を示す有力な証拠である。しかし、以下の可能性があるため絶対視しない。
 
@@ -85,7 +85,7 @@ license: "Internal use"
 
 テストと実装、ドキュメント、呼び出し元が矛盾する場合は、矛盾として明示する。
 
-### 5. 証拠の分離
+### 4. 証拠の分離
 
 必ず以下を分ける。
 
@@ -319,6 +319,101 @@ flowchart TD
 - エッジケース
 - 使用例
 
+---
+
+# 3Skillの役割分担
+
+`code-understanding-pro` は、コード理解スイートの親Skillである。対象と依頼内容を確認し、必要な下位Skillを選び、成果物を保存し、チャット要約を返す。
+
+| 対象 | 使用するフレーム / アダプター | `--adapter` |
+|---|---|---|
+| 一般的なスクリプト・アプリコード | `code-understanding-pyramid` | `generic` |
+| SQL、dbt、CTE、ウィンドウ関数 | `code-understanding-pyramid` + `stats-sql-comprehension` | `sql` |
+| R/Pythonの統計解析コード | `code-understanding-pyramid` + `stats-sql-comprehension` | `stats` |
+
+- `code-understanding-pyramid` は理解の順序を提供する。成果物の保存先は所有しない。
+- `stats-sql-comprehension` は専門観点を追加する。独自の長文チャット回答や別レポートを作らない。
+- 出力契約の正本は `references/interface.md` とする。
+
+---
+
+# 出力契約
+
+## チャットとMarkdownの使い分け
+
+このSkillは、回答の長さと再利用性に応じて出力先を切り替える。
+
+| モード | 主な用途 | 出力先 |
+|---|---|---|
+| Quick | 単一関数、短いコード、軽い質問 | チャットのみ |
+| Full | 複雑なコード理解、設計把握、オンボーディング | Markdown + チャット要約 |
+| Review | QA、バグ探し、マージ判断 | Markdown + チャット要約 |
+| Documentation | README、仕様書、設計メモ、DocString | Markdown + チャット要約 |
+| Refactoring | リファクタリング提案、変更前後比較 | Markdown + チャット要約 |
+
+Full、Review、Documentation、Refactoringでは、チャットに長文レポートを貼り付けるだけで完了としない。Markdown本文を保存し、チャットには結論、重要な指摘、保存先を簡潔に返す。
+
+## 保存先とファイル名
+
+成果物はリポジトリルートから次の形式で保存する。`<target>` は対象ファイルまたはディレクトリ名、`<id>` は指定されたIDまたはJST時刻である。
+
+```text
+skill_out/code_understanding/<target>/run_<id>/
+├── report.md
+├── run_meta.json
+└── source_manifest.json
+```
+
+`run_meta.json` には契約版、モード、アダプター、読者、対象、Skill版、生成時刻を記録する。`source_manifest.json` には根拠ソースのパス、存在状態、サイズ、SHA-256を記録し、ソース本文は複製しない。
+
+同一のrunディレクトリが既に存在する場合は上書きしない。再実行時は別の `--run-id` を指定する。
+
+## 保存手順
+
+AIが選択したテンプレートでMarkdown本文を作成した後、次のCLIで保存する。
+
+```bash
+python3 .agents/skills/code-understanding-pro/scripts/write_report.py \
+  --mode full \
+  --target src/example.py \
+  --content-file /tmp/report.md \
+  --output-root ./skill_out/code_understanding \
+  --run-id example \
+  --adapter generic \
+  --audience beginner \
+  --source src/example.py
+```
+
+出力先を自動生成するため、`--run-id` を省略してもよい。`--source` は複数回指定できる。CLIは3成果物のパスを標準出力する。
+
+保存後は必ず検証する。
+
+```bash
+python3 .agents/skills/code-understanding-pro/scripts/validate_report.py \
+  ./skill_out/code_understanding/example/run_example/report.md \
+  --adapter generic
+```
+
+## コンテキスト収集
+
+`collect_code_context.py` は従来どおり標準出力へ出力できる。再利用する場合は、run単位のMarkdownとして保存する。
+
+```bash
+python3 .agents/skills/code-understanding-pro/scripts/collect_code_context.py src tests \
+  --output-root ./skill_out/code_understanding \
+  --run-id context
+```
+
+単一ファイルへ保存する場合は `--output <path>` を使う。`--output-root` と `--output` を同時に指定した場合は `--output-root` を優先する。
+
+## 機密情報と失敗時の扱い
+
+- APIキー、パスワード、シークレット、Bearerトークン、秘密鍵は保存前に `[REDACTED]` へ置換する。
+- 入力コードや解析結果に個人情報が含まれる場合は、保存前に対象を確認し、必要に応じて匿名化する。
+- 保存に失敗した場合は、チャットに失敗理由を示し、未保存の本文を必要最小限だけ返す。
+- Quick ModeをMarkdown保存CLIへ渡してはならない。Quick Modeはチャット回答として完結させる。
+- 検証CLIが失敗した状態で完了報告しない。
+
 ### 4B. リファクタリング支援
 
 各提案に必ず含める。
@@ -495,6 +590,8 @@ DocString、README、Markdown、設計メモ作成で使う。
 - `references/review-severity-guide.md`
 - `references/refactoring-safety-checklist.md`
 - `references/test-first-caveats.md`
+- `references/interface.md`
+- `assets/output-template-beginner.md`
 - `assets/output-template-quick.md`
 - `assets/output-template-full.md`
 - `assets/output-template-review.md`
@@ -503,3 +600,5 @@ DocString、README、Markdown、設計メモ作成で使う。
 - `assets/docstring-template-python.md`
 - `assets/docstring-template-r.md`
 - `scripts/collect_code_context.py`
+- `scripts/write_report.py`
+- `scripts/validate_report.py`

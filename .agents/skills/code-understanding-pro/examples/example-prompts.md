@@ -18,6 +18,8 @@
 
 ```text
 この処理を、文脈・概要・詳細・設計意図・活用まで分けて説明して。
+
+深い解析結果は `skill_out/code_understanding/example/run_full_demo/report.md` に保存し、チャットには要点と保存先だけを返して。
 ```
 
 ## Review Mode
@@ -28,6 +30,20 @@
 
 ```text
 バグ、テスト不足、副作用、境界条件の観点でレビューして。
+
+レビュー結果は `skill_out/code_understanding/example/run_review_demo/report.md` に保存し、チャットにはCritical/Majorの要点と保存先だけを返して。
+
+## SQL Mode
+
+```text
+このSQLを初学者向けに説明してください。1行の粒度、CTE、JOIN前後の行数変化、検証SQLを含め、code-understanding-proのsqlアダプターでreport.mdへ保存してください。SQL自体は実行しないでください。
+```
+
+## Statistics Mode
+
+```text
+このR解析コードを初学者向けに説明してください。対象母集団、欠測・除外、推定量・前提、バイアス、再現コードを含め、statsアダプターでreport.mdへ保存してください。
+```
 ```
 
 ## Documentation Mode

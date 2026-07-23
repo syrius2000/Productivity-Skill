@@ -1,7 +1,7 @@
 ---
 name: stats-sql-comprehension
-description: 複雑な分析用SQL（dbt, BigQuery, CTE, ウィンドウ関数）や統計解析コード（R, Python）を5段階ピラミッドで解読・可視化・評価するスキル。ユーザーが「SQLを説明して」「クエリを解読して」「dbtモデルを解説して」「データフローを可視化して」「統計コードをレビューして」「SQLのパフォーマンスを評価して」と依頼したときに発動する。
-version: "1.0.0"
+description: Use when explaining, visualizing, reviewing, or evaluating complex analytical SQL, dbt models, BigQuery queries, CTEs, window functions, or R/Python statistical code.
+version: "2.0.0"
 license: "MIT"
 ---
 
@@ -10,6 +10,29 @@ license: "MIT"
 ## 目的
 
 このSkillは、高度で複雑な**分析用SQL（dbtモデル, BigQuery, CTE, ウィンドウ関数）**および**統計解析コード（R, Python）**を単に「説明」するだけでなく、データフローの可視化、処理の追跡、パフォーマンスおよび統計的妥当性の評価、最適化提案までを段階的に実行します。
+
+---
+
+## スイート内の役割
+
+本Skillは `code-understanding-pro` の専門アダプターである。
+
+| 対象 | アダプター | テンプレート |
+|---|---|---|
+| SQL、dbt、BigQuery、CTE | `sql` | `assets/output-template-sql.md` |
+| R/Python統計解析コード | `stats` | `assets/output-template-stats.md` |
+
+- 共通理解の順序は `code-understanding-pyramid` を使う。
+- 成果物は親Skillの `report.md`、`run_meta.json`、`source_manifest.json` に統合する。
+- 独自の出力ディレクトリや長文チャット回答を作らない。
+- 完了前に親Skillの `validate_report.py` を対応アダプターで実行する。
+
+## SQL安全契約
+
+- SQLは原則として読解対象であり、ユーザーの明示承認なしに実行しない。
+- 実行が承認された場合も、まず読み取り専用の件数・重複・NULL・JOIN前後検証を行う。
+- DB名、SQL方言、1行の粒度、JOINキーが不明な場合は推測と事実を分ける。
+- PHI/PIIや認証情報をレポートへ複製しない。
 
 ---
 
@@ -99,9 +122,9 @@ flowchart TD
 
 ## Step 4: 実務アウトプット生成
 
-目的：ユーザーの目的に合わせて解説書、高速化されたSQL、品質検証クエリを出力します。
+目的：ユーザーの目的に合わせた専門分析を、親Skillの共通 `report.md` へ返します。
 
-出力形式の指定（`assets/` 参照）：
+専門節の形式（`assets/` 参照）：
 - `assets/output-template-sql.md`: SQL解読・解説レポート
 - `assets/output-template-stats.md`: 統計解析評価レポート
 - `assets/mermaid-dataflow-patterns.md`: データフロー図パターン

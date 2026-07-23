@@ -22,6 +22,8 @@ import sys
 from pathlib import Path
 from typing import Iterable
 
+from write_report import write_explicit_report, write_markdown_report
+
 DEFAULT_EXCLUDES = {
     ".git", ".hg", ".svn", "__pycache__", ".pytest_cache", ".mypy_cache",
     ".venv", "venv", "node_modules", "dist", "build", ".idea", ".vscode",
@@ -105,33 +107,66 @@ def fenced_language(path: Path) -> str:
     }.get(suffix, "text")
 
 
+def collect_context(paths: list[Path], exts: set[str], excludes: set[str], max_bytes: int) -> str:
+    blocks = [
+        "# Code Context",
+        "",
+        "このファイルはコード理解用に自動収集されたコンテキストです。機密情報が含まれていないか確認してください。",
+        "",
+    ]
+    emitted = sum(len(block.encode("utf-8")) for block in blocks)
+    for path in iter_files(paths, exts, excludes):
+        text = read_text_safely(path)
+        block = f"\n## `{path}`\n\n```{fenced_language(path)}\n{text}\n```\n"
+        block_size = len(block.encode("utf-8", errors="replace"))
+        if emitted + block_size > max_bytes:
+            blocks.append("\n<!-- 出力上限に達したため、以降のファイルは省略しました。 -->")
+            break
+        blocks.append(block)
+        emitted += block_size
+    return "\n".join(blocks) + "\n"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="コード理解用Markdownコンテキストを生成します。")
     parser.add_argument("paths", nargs="+", help="対象ファイルまたはディレクトリ")
     parser.add_argument("--ext", nargs="*", default=None, help="対象拡張子。例: --ext .py .md")
     parser.add_argument("--exclude", nargs="*", default=None, help="除外ディレクトリ名")
     parser.add_argument("--max-bytes", type=int, default=300_000, help="総出力サイズ上限")
+    parser.add_argument("--output", type=Path, help="指定したMarkdownファイルへ保存")
+    parser.add_argument("--output-root", type=Path, help="run単位の出力先親ディレクトリ")
+    parser.add_argument("--run-id", help="runディレクトリに使うID")
     args = parser.parse_args()
 
     exts = set(args.ext) if args.ext else DEFAULT_EXTS
     excludes = DEFAULT_EXCLUDES | set(args.exclude or [])
     targets = [Path(p).resolve() for p in args.paths]
 
-    emitted = 0
-    print("# Code Context")
-    print()
-    print("このファイルはコード理解用に自動収集されたコンテキストです。機密情報が含まれていないか確認してください。")
-    print()
-
-    for path in iter_files(targets, exts, excludes):
-        text = read_text_safely(path)
-        block = f"\n## `{path}`\n\n```{fenced_language(path)}\n{text}\n```\n"
-        b = block.encode("utf-8", errors="replace")
-        if emitted + len(b) > args.max_bytes:
-            print("\n<!-- 出力上限に達したため、以降のファイルは省略しました。 -->")
-            break
-        print(block)
-        emitted += len(b)
+    content = collect_context(targets, exts, excludes, args.max_bytes)
+    if args.output_root:
+        target = targets[0].name if len(targets) == 1 else "project_context"
+        try:
+            path = write_markdown_report(
+                content,
+                mode="context",
+                target=target,
+                output_root=args.output_root,
+                run_id=args.run_id,
+            )
+        except (OSError, UnicodeError, ValueError) as error:
+            print(f"エラー: {error}", file=sys.stderr)
+            return 1
+        print(path)
+        print(path.parent / "run_meta.json")
+        print(path.parent / "source_manifest.json")
+    elif args.output:
+        try:
+            print(write_explicit_report(content, args.output))
+        except (OSError, UnicodeError) as error:
+            print(f"エラー: {error}", file=sys.stderr)
+            return 1
+    else:
+        print(content, end="")
 
     return 0
 

@@ -1,5 +1,7 @@
 # Quick Mode 出力テンプレート
 
+Quick Modeはチャットのみで回答し、Markdown成果物を保存しない。
+
 ```markdown
 ## 要約
 ...
