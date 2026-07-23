@@ -23,6 +23,10 @@ skill_out/code_understanding/<target>/run_<id>/
 
 Quick Modeはチャットのみで完結する。Full、Review、Documentation、Refactoringは上記3ファイルを必須とする。
 
+最終run名を排他的に予約してから3ファイルを直接書き込む。そのため成功前には部分的なrunが見えることがある。生成中は `.incomplete` を置き、成功時だけ削除する。例外、プロセス強制終了、電源断では `.incomplete` または部分ファイルが残るため、内容確認後に利用者が削除するか、別のrun IDで再実行する。
+
+出力rootは、生成中に他プロセスや他利用者が変更しない信頼済み非共有ディレクトリとする。同一UIDの別プロセスによる能動的な親ディレクトリ差し替えは保護境界外である。
+
 ## Context補助成果物（レポート契約の対象外）
 
 `collect_code_context.py --output-root` は、解析済みレポートではなく、親Skillを補助するContext成果物を保存する。
@@ -36,6 +40,8 @@ skill_out/code_understanding/<target>/run_<id>/
 
 `code_context.md` は収集した生テキストを含む補助資料であり、Full、Review、Documentation、Refactoringの `report.md` 契約の対象外である。必須見出しを満たすことを要求せず、`validate_report.py` の検証CLIの対象外とする。収集結果をそのまま `report.md` へ強制してはならない。
 
+Context成果物の `run_meta.json` は `mode=Context` と `report_file=code_context.md` を記録する。
+
 Contextの `source_manifest.json` は、実際に `code_context.md` へ出力された各ファイルを記録する。ディレクトリ引数は実際に出力されたファイルへ展開し、出力上限などで省略されたファイルやディレクトリ自体は記録しない。
 
 ## `run_meta.json`
@@ -45,11 +51,11 @@ Contextの `source_manifest.json` は、実際に `code_context.md` へ出力さ
 | `interface_version` | string | この契約の版 |
 | `skill` | string | 成果物を所有するSkill |
 | `skill_version` | string | Skill版 |
-| `mode` | string | Full / Review / Documentation / Refactoring |
+| `mode` | string | Full / Review / Documentation / Refactoring。Context成果物では `Context` |
 | `adapter` | string | `generic` / `sql` / `stats` |
 | `audience` | string | `beginner` / `practitioner` / `expert` |
 | `target` | string | 解析対象 |
-| `report_file` | string | 常に `report.md` |
+| `report_file` | string | 通常成果物では `report.md`、Context成果物では `code_context.md` |
 | `generated_at` | string | JSTを含むISO 8601時刻 |
 
 ## `source_manifest.json`
@@ -70,6 +76,12 @@ Contextの `source_manifest.json` は、実際に `code_context.md` へ出力さ
 `sql` アダプターは、データ粒度、テーブル・CTE一覧、JOINと行数変化、検証SQLも必須とする。
 
 `stats` アダプターは、対象母集団、欠測・除外、推定量・前提、バイアスと妥当性、再現・検証コードも必須とする。
+
+## 機密情報の保存規則
+
+JSON、YAML、通常のenv代入として安全に解析できる秘密値は、周辺構文を維持して `[REDACTED]` に置換する。未閉じ引用符、複数行引用符、YAML block scalar、ANSI-C引用、command substitution、未引用backslash escape、引用値の連結などの曖昧な秘密形式は出力予約前に保存を中止する。これは曖昧な構文を推測して保存しないためのfail-closed契約である。
+
+I/O失敗時の自動cleanupは、同名へ差し替えられた競合物を誤削除し得るため行わない。`.incomplete` または部分的な明示出力を利用者が確認して削除する。
 
 ## 完了条件
 
