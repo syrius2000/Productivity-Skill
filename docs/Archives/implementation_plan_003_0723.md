@@ -14,6 +14,7 @@ author: AI Agent (Gemini 3.6 Flash)
 以下の 10 個のスキルを本リポジトリの `.agents/skills/` ディレクトリにコピーします。
 
 ### 🌶️ Grilling 関連スキル（質問・面接・思考整理）
+
 1. **`grilling`** (`mattpocock-skills/skills/productivity/grilling`)
    - アイデアや設計に対する多角的・妥協のない1問1答面接スキル。
 2. **`grill-me`** (`mattpocock-skills/skills/productivity/grill-me`)
@@ -22,6 +23,7 @@ author: AI Agent (Gemini 3.6 Flash)
    - 面接を行いながら、同時にドキュメント（ADRおよびドメイン用語集）を自動生成する拡張スキル。
 
 ### 🛠️ 開発・設計・デバッグ支援スキル
+
 4. **`diagnosing-bugs`** (`mattpocock-skills/skills/engineering/diagnosing-bugs`)
    - 確実な再現ループと仮説検証による構造的バグ診断スキル。
 5. **`to-spec`** (`mattpocock-skills/skills/engineering/to-spec`)
@@ -34,6 +36,7 @@ author: AI Agent (Gemini 3.6 Flash)
    - プロジェクト固有の用語集（Glossary）およびドメイン構造モデルを維持・管理するスキル。
 
 ### 📚 教育・スキル構築支援スキル
+
 9. **`teach`** (`mattpocock-skills/skills/productivity/teach`)
    - インタラクティブな対話形式で技術やコード構造をわかりやすく教育するスキル。
 10. **`writing-great-skills`** (`mattpocock-skills/skills/productivity/writing-great-skills`)
