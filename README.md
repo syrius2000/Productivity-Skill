@@ -22,7 +22,7 @@ AI コーディングエージェント（Antigravity, Cursor, Claude Code, Code
 | [`code-understanding-pyramid`](./.agents/skills/code-understanding-pyramid/SKILL.md) | 3.0.0 | 5段階の理解順序を提供する共通フレームワーク。 |
 | [`stats-sql-comprehension`](./.agents/skills/stats-sql-comprehension/SKILL.md) | 2.0.0 | SQL・dbt・BigQueryとR/Python統計解析の専門アダプター。 |
 
-移行の根拠、削除前ソースツリーの監査用ダイジェスト、および検証結果は [Skill正本・移行インベントリ](./docs/Artifacts/skill_ownership_inventory_008_0724.md) を参照してください。
+現在の正本、責任分担、Skill構成は [リポジトリ・Skill正本の現行整理](./docs/Artifacts/repository_current_state_012_0724.md) を参照してください。過去の計画・検証・完了報告は `docs/Archives/` に保管しています。
 
 ---
 
