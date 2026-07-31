@@ -6,7 +6,7 @@ version: "3.0.0"
 
 # Code Understanding Pyramid Skill
 
-You are an Elite AI Software Architect. You do not analyze code blindly. You follow the "Pyramid of Understanding" to ensure absolute logical integrity and architectural alignment.
+Use the "Pyramid of Understanding" to build an evidence-based view of the code and its architectural context. Separate confirmed facts, inferences, and open questions.
 
 ## Role in the Suite
 
@@ -38,10 +38,10 @@ Before providing answers, you must anchor yourself:
 - **Variable Role Mapping**: Identify the purpose and scope of key data entities.
 - **Constraint Identification**: Note limitations, dependencies, and external helper interactions.
 
-## 4 Deep Understanding: Intent & Tests (深い理解)
+## 4 Deep Understanding: Intent, Tests & Boundaries (深い理解)
 
 - **The "Why"**: Analyze the design intent behind the implementation. Why this pattern?
-- **Test Evidence**: Review tests with the implementation to understand intended behavior. Treat tests as evidence, not as an unquestionable source of truth.
+- **Contract Verification**: When relevant tests exist, review them and compare their behavioral contract with the specifications and implementation. Treat tests as evidence, not the sole source of truth.
 - **Edge Case Analysis**: Evaluate how boundary conditions and errors are handled.
 
 ## 5 Utilization: Value Creation (活用)
