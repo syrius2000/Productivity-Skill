@@ -1,0 +1,12 @@
+[project]
+name = "spec-driven-qa-review-tools"
+version = "0.1.0"
+description = "Standard-library helper tools for the spec-driven-qa-review Skill"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

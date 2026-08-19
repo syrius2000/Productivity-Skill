@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Spec-Driven QA Review Case",
+  "type": "object",
+  "required": [
+    "id",
+    "status",
+    "qa_profile",
+    "subject",
+    "participants"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^QA-[0-9]{4,}$"
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "review-in-progress",
+        "author-action-required",
+        "author-response-submitted",
+        "verification-in-progress",
+        "adjudication-required",
+        "ready-for-closure",
+        "closed",
+        "blocked",
+        "needs-review",
+        "deferred",
+        "risk-accepted",
+        "superseded",
+        "cancelled"
+      ]
+    },
+    "result": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "qa_profile": {
+      "enum": [
+        "lite",
+        "standard",
+        "strict"
+      ]
+    },
+    "current_cycle": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "subject": {
+      "type": "object"
+    },
+    "participants": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}

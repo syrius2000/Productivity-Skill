@@ -22,7 +22,7 @@ AI コーディングエージェント（Antigravity, Cursor, Claude Code, Code
 | [`code-understanding-pyramid`](./.agents/skills/code-understanding-pyramid/SKILL.md) | 3.0.0          | 5段階の理解順序を提供する共通フレームワーク。                                                                                     |
 | [`stats-sql-comprehension`](./.agents/skills/stats-sql-comprehension/SKILL.md)       | 2.0.0          | SQL・dbt・BigQueryとR/Python統計解析の専門アダプター。                                                                            |
 
-現在の正本、責任分担、Skill構成は [リポジトリ・Skill正本の現行整理](./docs/Artifacts/repository_current_state_012_0724.md) を参照してください。過去の計画・検証・完了報告は `docs/Archives/` に保管しています。
+現在の正本、責任分担、Skill構成は本READMEと `.agents/skills/` の実体を参照してください。過去の整理履歴は [リポジトリ・Skill正本整理のアーカイブ概要](./docs/Archives/archived_summary_001_0819.md) に保管しています。
 
 ---
 
@@ -49,7 +49,7 @@ npx skills add syrius2000/Productivity-Skill -g
 
 ---
 
-## 🛠️ 収録スキル一覧 (7 Skills)
+## 🛠️ 収録スキル一覧 (9 Skills)
 
 ### 1. 📊 統計解析＆SQL高度解読
 
@@ -108,6 +108,20 @@ npx skills add syrius2000/Productivity-Skill -g
 
 ---
 
+### 6. 📦 QA・Artifact管理
+
+#### 🗄️ **`artifacts-archiver`**
+
+- **概要**: `docs/Artifacts/` の完了済み計画・報告を対象期間付きの概要へ統合し、`docs/Archives/` へ整理するスキル。
+- **起動方法**: Artifactのアーカイブ・整理を自然言語で依頼。
+
+#### 🔍 **`spec-driven-qa-review`**
+
+- **概要**: Purpose、Spec、Plan、Implementation、Tests、Evidenceを独立に照合し、Finding・トレーサビリティ・レビューサイクルを記録するスキル。
+- **起動方法**: 明示したファイルまたはディレクトリのQAレビューを自然言語で依頼。
+
+---
+
 ## 📁 ディレクトリ構造
 
 ```text
@@ -117,7 +131,9 @@ npx skills add syrius2000/Productivity-Skill -g
 │       ├── code-understanding-pro/
 │       ├── code-understanding-pyramid/
 │       ├── domain-modeling/
+│       ├── artifacts-archiver/
 │       ├── grilling/
+│       ├── spec-driven-qa-review/
 │       ├── stats-sql-comprehension/
 │       ├── teach/
 │       └── writing-great-skills/

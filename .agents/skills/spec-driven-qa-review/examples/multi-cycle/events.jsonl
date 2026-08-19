@@ -1,0 +1,5 @@
+{"timestamp":"2026-08-13T10:00:00+09:00","case_id":"QA-0002","cycle":0,"actor":"system","role":"system","action":"case_created","revision":"b1c2d3e","result":"draft"}
+{"timestamp":"2026-08-13T10:25:00+09:00","case_id":"QA-0002","cycle":1,"actor":"cursor-reviewer","role":"reviewer","action":"findings_issued","revision":"b1c2d3e","result":"author-action-required"}
+{"timestamp":"2026-08-13T10:45:00+09:00","case_id":"QA-0002","cycle":1,"actor":"codex-implementer","role":"implementer","action":"fix_submitted","revision":"d7e8f9a","result":"verification-required"}
+{"timestamp":"2026-08-13T11:00:00+09:00","case_id":"QA-0002","cycle":1,"actor":"cursor-reviewer","role":"reviewer","action":"verification_completed","revision":"d7e8f9a","result":"partially-accepted"}
+{"timestamp":"2026-08-13T11:15:00+09:00","case_id":"QA-0002","cycle":2,"actor":"cursor-reviewer","role":"reviewer","action":"finding_issued","revision":"d7e8f9a","result":"author-action-required"}

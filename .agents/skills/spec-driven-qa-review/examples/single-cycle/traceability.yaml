@@ -1,0 +1,22 @@
+schema_version: "1.0"
+case_id: QA-0001
+claims:
+  - id: CLAIM-001
+    statement: Missing patient ID records are rejected before analysis.
+    source:
+      type: specification
+      reference: REQ-014
+    plan_refs: [PLAN-VALIDATION-01]
+    task_refs: [TASK-04]
+    implementation:
+      - path: src/validation/patient.py
+        symbol: validate_patient
+        revision: c4d5e6f
+    evidence:
+      - id: EVID-001
+        type: test
+        reference: tests/test_patient_validation.py::test_missing_patient_id_is_rejected
+    assessment:
+      result: supported
+      confidence: high
+      rationale: Code and regression test directly cover the acceptance condition.

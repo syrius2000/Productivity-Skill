@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Spec-Driven QA Findings",
+  "type": "object",
+  "required": [
+    "case_id",
+    "findings"
+  ],
+  "properties": {
+    "case_id": {
+      "type": "string"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "category",
+          "severity",
+          "severity_rationale",
+          "status",
+          "evidence"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "severity_rationale": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array"
+          },
+          "limitations": {
+            "type": "array"
+          }
+        }
+      }
+    }
+  }
+}

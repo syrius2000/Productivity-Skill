@@ -1,0 +1,25 @@
+schema_version: "1.0"
+case_id: QA-XXXX
+findings:
+  - id: QA-XXXX-F01
+    title: "REQUIRED:REVIEWER:FINDING-TITLE"
+    category: evidence-gap
+    severity: medium
+    severity_rationale: "REQUIRED:REVIEWER:SEVERITY-RATIONALE"
+    status: open
+    first_seen_cycle: 1
+    claim_refs: []
+    requirement_refs: []
+    evidence:
+      - type: code
+        reference: "REQUIRED:REVIEWER:EVIDENCE"
+        revision: "REQUIRED:SYSTEM-REVISION"
+    limitations: []
+    requested_action: "REQUIRED:REVIEWER:REQUESTED-ACTION"
+    fingerprint:
+      category: evidence-gap
+      requirement_id: null
+      primary_path: null
+      semantic_key: "REQUIRED:REVIEWER:SEMANTIC-KEY"
+    author_response: null
+    verification: null

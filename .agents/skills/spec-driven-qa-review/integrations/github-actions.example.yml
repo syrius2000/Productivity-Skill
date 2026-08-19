@@ -1,0 +1,21 @@
+name: Spec-Driven QA Validation
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  qa-record-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check unresolved REQUIRED markers
+        run: python .agents/skills/spec-driven-qa-review/scripts/detect_unresolved_markers.py docs/ADR/QA
+      - name: Validate QA cases
+        run: python .agents/skills/spec-driven-qa-review/scripts/validate_review_case.py docs/ADR/QA --all
