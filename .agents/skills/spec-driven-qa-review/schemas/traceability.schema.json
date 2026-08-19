@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Spec-Driven QA Traceability",
+  "type": "object",
+  "required": [
+    "case_id",
+    "claims"
+  ],
+  "properties": {
+    "case_id": {
+      "type": "string"
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "statement",
+          "source",
+          "assessment"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "statement": {
+            "type": "string"
+          },
+          "source": {
+            "type": "object"
+          },
+          "implementation": {
+            "type": "array"
+          },
+          "evidence": {
+            "type": "array"
+          },
+          "assessment": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  }
+}

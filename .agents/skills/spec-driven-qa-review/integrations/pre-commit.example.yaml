@@ -1,0 +1,15 @@
+# Merge this hook into your repository's .pre-commit-config.yaml.
+# Adjust the Skill path if you install it elsewhere.
+repos:
+  - repo: local
+    hooks:
+      - id: spec-driven-qa-required-markers
+        name: Validate Spec-Driven QA REQUIRED markers
+        entry: python .agents/skills/spec-driven-qa-review/scripts/detect_unresolved_markers.py docs/ADR/QA
+        language: system
+        pass_filenames: false
+      - id: spec-driven-qa-case-validation
+        name: Validate Spec-Driven QA cases
+        entry: python .agents/skills/spec-driven-qa-review/scripts/validate_review_case.py docs/ADR/QA --all
+        language: system
+        pass_filenames: false

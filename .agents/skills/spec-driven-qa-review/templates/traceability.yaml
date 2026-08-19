@@ -1,0 +1,19 @@
+schema_version: "1.0"
+case_id: QA-XXXX
+claims:
+  - id: CLAIM-001
+    statement: "REQUIRED:REVIEWER:CLAIM"
+    source:
+      type: specification
+      reference: "REQUIRED:REVIEWER:SOURCE-REF"
+    plan_refs: []
+    task_refs: []
+    implementation:
+      - path: "REQUIRED:REVIEWER:IMPLEMENTATION-PATH"
+        symbol: null
+        revision: "REQUIRED:SYSTEM-REVISION"
+    evidence: []
+    assessment:
+      result: not-assessable
+      confidence: unknown
+      rationale: "REQUIRED:REVIEWER:ASSESSMENT-RATIONALE"

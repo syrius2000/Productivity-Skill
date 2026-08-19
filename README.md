@@ -22,7 +22,7 @@ AI コーディングエージェント（Antigravity, Cursor, Claude Code, Code
 | [`code-understanding-pyramid`](./.agents/skills/code-understanding-pyramid/SKILL.md) | 3.0.0          | 5段階の理解順序を提供する共通フレームワーク。                                                                                     |
 | [`stats-sql-comprehension`](./.agents/skills/stats-sql-comprehension/SKILL.md)       | 2.0.0          | SQL・dbt・BigQueryとR/Python統計解析の専門アダプター。                                                                            |
 
-現在の正本、責任分担、Skill構成は [リポジトリ・Skill正本の現行整理](./docs/Artifacts/repository_current_state_012_0724.md) を参照してください。過去の計画・検証・完了報告は `docs/Archives/` に保管しています。
+現在の正本、責任分担、Skill構成は本READMEと `.agents/skills/` の実体を参照してください。過去の整理履歴は [リポジトリ・Skill正本整理のアーカイブ概要](./docs/Archives/archived_summary_001_0819.md) に保管しています。
 
 ---
 
@@ -49,7 +49,7 @@ npx skills add syrius2000/Productivity-Skill -g
 
 ---
 
-## 🛠️ 収録スキル一覧 (7 Skills)
+## 🛠️ 収録スキル一覧 (9 Skills)
 
 ### 1. 📊 統計解析＆SQL高度解読
 
@@ -85,11 +85,14 @@ npx skills add syrius2000/Productivity-Skill -g
 - **特徴**: 1度に複数質問をせず、対話形式で条件分岐や制約をクリアにしていきます。環境から調べられる事実はAIが調査し、意思決定のみをユーザーに求めます。
 - **起動方法**: 自然言語で依頼（例：設計やプランの検討時に「grill」「面接して」「深掘りして」）
 
+---
+
 ### 4. 🏗️ ドメインモデル管理
 
 #### 📘 **`domain-modeling`**
 
 - **概要**: チームやプロジェクト固有の「ユビキタス言語（用語集/Glossary）」およびドメイン構造モデルを整理・保守するスキル。
+- **特徴**: 用語の統一・定義揺れの修正、アーキテクチャ上の決定事項の明確化、ドメイン用語の変更追跡を支援します。
 - **起動方法**: 自然言語で依頼（例：用語集の作成・更新、ドメインモデルの定義）
 
 ---
@@ -99,12 +102,30 @@ npx skills add syrius2000/Productivity-Skill -g
 #### 👨‍🏫 **`teach`**
 
 - **概要**: 一方的な解説ではなく、対話形式で段階的に複雑な技術・アルゴリズム・コードの仕組みを教えてくれる教育スキル。
+- **特徴**: ユーザーの知識レベルに合わせて質問を投げかけ、理解度を確認しながらインタラクティブに解説を進行します。
 - **起動方法**: `/teach`（明示起動）
 
 #### 🛠️ **`writing-great-skills`**
 
 - **概要**: エージェント用の新しいスキルを作成・修正する際、TDDアプローチと抜け穴塞ぎ（Bulletproofing）によって高品質なスキルを設計するガイドラインスキル。
+- **特徴**: スキル作成時のベストプラクティス提示、YAMLフロントマター検証、テストケース駆動の設計指導を行います。
 - **起動方法**: `/writing-great-skills`（明示起動）
+
+---
+
+### 6. 📦 QA・Artifact管理
+
+#### 🗄️ **`artifacts-archiver`**
+
+- **概要**: `docs/Artifacts/` の完了済み計画・報告を対象期間付きの概要へ統合し、`docs/Archives/` へ整理するスキル。
+- **特徴**: 過去の複数アーティファクトを要約統合し、進行中計画のID採番を維持しながら古い成果物を安全にアーカイブします。
+- **起動方法**: 自然言語で依頼（例：「過去のPlanをアーカイブして」「成果物を整理して」）
+
+#### 🔍 **`spec-driven-qa-review`**
+
+- **概要**: Purpose、Spec、Plan、Implementation、Tests、Evidenceを独立に照合し、Finding・トレーサビリティ・レビューサイクルを記録するスキル。
+- **特徴**: 仕様と実装の乖離検出、見逃しがちな懸念点の発見、マルチサイクル/シングルサイクルのレビュー検証と追跡を実施します。
+- **起動方法**: 自然言語で依頼（例：「指定ファイルのQAレビューを実施して」「仕様との照合チェックをして」）
 
 ---
 
@@ -114,10 +135,12 @@ npx skills add syrius2000/Productivity-Skill -g
 .
 ├── .agents/
 │   └── skills/                  # エージェントスキル格納フォルダ
+│       ├── artifacts-archiver/
 │       ├── code-understanding-pro/
 │       ├── code-understanding-pyramid/
 │       ├── domain-modeling/
 │       ├── grilling/
+│       ├── spec-driven-qa-review/
 │       ├── stats-sql-comprehension/
 │       ├── teach/
 │       └── writing-great-skills/

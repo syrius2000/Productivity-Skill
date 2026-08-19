@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Spec-Driven QA Event",
+  "type": "object",
+  "required": [
+    "timestamp",
+    "cycle",
+    "actor",
+    "role",
+    "action"
+  ],
+  "properties": {
+    "timestamp": {
+      "type": "string"
+    },
+    "cycle": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "actor": {
+      "type": "string"
+    },
+    "role": {
+      "enum": [
+        "implementer",
+        "reviewer",
+        "adjudicator",
+        "human",
+        "system"
+      ]
+    },
+    "action": {
+      "type": "string"
+    },
+    "revision": {
+      "type": "string"
+    },
+    "result": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}
