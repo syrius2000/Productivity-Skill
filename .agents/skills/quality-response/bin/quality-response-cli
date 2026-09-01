@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+skill_root=$(CDPATH= cd -- "$script_dir/.." && pwd)
+
+if [ -n "${PYTHONPATH:-}" ]; then
+  export PYTHONPATH="$skill_root/runtime:$PYTHONPATH"
+else
+  export PYTHONPATH="$skill_root/runtime"
+fi
+
+exec python3 -B -m quality_loop.cli "$@"
