@@ -1,0 +1,27 @@
+{
+  "skill_name": "quality-review",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Quality Loop案件QMS-EVAL-01を初回レビューしてください。statusではnext_role=reviewer、next_action=reviewです。仕様外の一般的な改善案と、要求違反を分けて扱ってください。",
+      "expected_output": "baselineを固定し、要求違反だけをFinding、仕様外案をimprovement-proposalとして分離し、review操作後のhandoffを示す。",
+      "files": [],
+      "expectations": [
+        "Reviewerがbaselineを変更しない",
+        "要求違反とimprovement-proposalを分離する",
+        "次工程のnext_role、next_action、handoffを示す"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Quality Loop案件QMS-EVAL-02のImplementer修正を独立検証してください。実機は利用できず、申告外のextra.txt変更が観測されています。",
+      "expected_output": "未確認をfailedにせず、三者照合で申告外変更を検出し、Owner裁定語を使わず次の必要操作を示す。",
+      "files": [],
+      "expectations": [
+        "実機未接続をunverifiedまたはevidence-gapとして扱う",
+        "申告外変更を安全な結果へ補完しない",
+        "Owner裁定を代行せず受入や不受入を宣言しない"
+      ]
+    }
+  ]
+}
