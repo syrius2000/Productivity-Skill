@@ -19,9 +19,39 @@ def test_suite_roles_and_output_contract_are_consistent() -> None:
     assert "report.md" in pro
     assert "source_manifest.json" in pro
     assert "Do not create an independent output directory." in pyramid
+    assert "do not operate as a standalone report writer" in pyramid
     assert "code-understanding-pro" in specialist
     assert "`sql`" in specialist
     assert "`stats`" in specialist
+    assert "do not operate as a standalone report writer" in specialist
+
+
+def test_general_review_vocabulary_is_consistent() -> None:
+    expected = ("[Critical]", "[Major]", "[Consider]", "[Nit]", "[FYI]")
+    files = (
+        SKILLS / "code-understanding-pro/SKILL.md",
+        SKILLS / "code-understanding-pyramid/SKILL.md",
+        ROOT / "README.md",
+        SKILLS / "code-understanding-pro/assets/output-template-review.md",
+        SKILLS / "code-understanding-pro/references/review-severity-guide.md",
+        SKILLS / "code-understanding-pro/examples/expected-output-skeleton.md",
+    )
+    for path in files:
+        text = path.read_text(encoding="utf-8")
+        for label in expected:
+            token = label if path.name in {"SKILL.md", "README.md"} else label.strip("[]")
+            assert token in text, f"{path}: {token}"
+
+
+def test_parent_only_specialists_explain_their_boundary() -> None:
+    pro = (SKILLS / "code-understanding-pro/SKILL.md").read_text(encoding="utf-8")
+    pyramid = (SKILLS / "code-understanding-pyramid/SKILL.md").read_text(encoding="utf-8")
+    specialist = (SKILLS / "stats-sql-comprehension/SKILL.md").read_text(encoding="utf-8")
+
+    assert "同じSkill配置ルート" in pro
+    assert "親Skill単独の一般分析" in pro
+    assert "sibling Skill layout" in pyramid
+    assert "親Skillが利用できない場合" in specialist
 
 
 def test_suite_has_no_legacy_report_filenames() -> None:

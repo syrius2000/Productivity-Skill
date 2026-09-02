@@ -10,8 +10,8 @@ author: Codex (GPT-5)
 
 ## アーカイブ対象
 
-- [実装計画書](implementation_plan_012_0819.md)
-- [QA-0001記録](QA/QA-0001-plan-012-skill-placement/)
+- 実装計画書（旧 `implementation_plan_012_0819.md`、現 [Summary 03](archived_summary_003_0901.md) に集約）
+- QA-0001記録（旧 `QA/QA-0001-plan-012-skill-placement/`）
 
 実装計画書とクローズ済みQA記録を、次の作業で参照できるようArchivesへ移動した。計画書の原文とQA記録一式は保持し、ArtifactsおよびアクティブQA領域からは除いた。
 

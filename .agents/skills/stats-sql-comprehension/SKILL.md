@@ -1,6 +1,6 @@
 ---
 name: stats-sql-comprehension
-description: Use when explaining, visualizing, reviewing, or evaluating complex analytical SQL, dbt models, BigQuery queries, CTEs, window functions, or R/Python statistical code.
+description: Use when code-understanding-pro needs specialist analysis of complex analytical SQL, dbt models, BigQuery queries, CTEs, window functions, or R/Python statistical code. Return findings to that parent Skill; do not operate as a standalone report writer.
 version: "2.0.0"
 license: "MIT"
 ---
@@ -23,7 +23,7 @@ license: "MIT"
 | R/Python統計解析コード | `stats` | `assets/output-template-stats.md` |
 
 - 共通理解の順序は `code-understanding-pyramid` を使う。
-- 成果物は親Skillの `report.md`、`run_meta.json`、`source_manifest.json` に統合する。
+- 成果物は親Skillの `report.md`、`run_meta.json`、`source_manifest.json` に統合する。親Skillが利用できない場合は、保存や検証を開始せず、その制約を明示して専門観点だけを返す。
 - 独自の出力ディレクトリや長文チャット回答を作らない。
 - 完了前に親Skillの `validate_report.py` を対応アダプターで実行する。
 

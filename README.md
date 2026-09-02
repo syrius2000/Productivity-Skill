@@ -1,35 +1,37 @@
 # Productivity Skill Portfolio
 
-AI コーディングエージェント（Antigravity, Cursor, Claude Code, Codex, Gemini CLI 等）の生産性を飛躍的に高めるためのエージェントスキル（Agent Skills）コレクションです。
+AI コーディングエージェント（Antigravity, Cursor, Claude Code, Codex, 及びそのCLI）の生産性を飛躍的に高めるためのエージェントスキル（Agent Skills）コレクションです。
 
 ---
 
 ## 🧭 汎用Skillの正本と編集先
 
-`Productivity-Skill` は、汎用的なコード理解・開発生産性Skillの正本です。一般コード、SQL、統計コードの理解・レビューを改善する場合は、このリポジトリ内のSkillを編集します。
+`Productivity-Skill` は、汎用的なコード理解・開発生産性・QA品質管理Skillの正本です。一般コード、SQL、統計コードの理解・レビューや品質管理ワークフローを改善する場合は、このリポジトリ内のSkillを編集します。
 
-| 編集したい領域               | 正本リポジトリ                                                                       | 編集先・責任範囲                                                                                                                                                      |
-| ---------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 汎用コード理解・開発生産性   | このリポジトリ                                                                       | [`.agents/skills/`](./.agents/skills/) 配下。`code-understanding-pro` は親Skillとして、一般コードを `generic`、SQLを `sql`、R/Python統計コードを `stats` に分岐する。 |
-| DB固有SkillとRWDワークフロー | [rwd-mysql-skill-toolkit](https://github.com/syrius2000/rwd-mysql-skill-toolkit)     | DB固有Skillの正本であり、`Productivity-Skill` と `agentic-evidence-analysis` を利用する「RWDデータワークフローの実行・統合ハブ」。                                    |
-| VCD・統計的エビデンス分析    | [agentic-evidence-analysis](https://github.com/syrius2000/agentic-evidence-analysis) | VCD・統計的エビデンス分析Skillの正本。                                                                                                                                |
+| 編集したい領域 | 正本リポジトリ | 編集先・責任範囲 |
+| :--- | :--- | :--- |
+| **汎用コード理解・開発生産性・QA管理** | このリポジトリ | [`.agents/skills/`](./.agents/skills/) 配下。`code-understanding-pro` は親Skillとして、一般コードを `generic`、SQLを `sql`、R/Python統計コードを `stats` に分岐。品質管理は `quality-review` / `quality-response` を提供。 |
+| **DB固有SkillとRWDワークフロー** | [rwd-mysql-skill-toolkit](https://github.com/syrius2000/rwd-mysql-skill-toolkit) | DB固有Skillの正本であり、`Productivity-Skill` と `agentic-evidence-analysis` を利用する「RWDデータワークフローの実行・統合ハブ」。 |
+| **VCD・統計的エビデンス分析** | [agentic-evidence-analysis](https://github.com/syrius2000/agentic-evidence-analysis) | VCD・統計的エビデンス分析Skillの正本。 |
 
 ### コード理解スイート
 
-| Skill                                                                                | 現行バージョン | 役割                                                                                                                              |
-| ------------------------------------------------------------------------------------ | -------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| [`code-understanding-pro`](./.agents/skills/code-understanding-pro/SKILL.md)         | 2.0.0-ja       | 親Skill。対象を判定し、一般コードは `generic`、SQLは `sql`、R/Python統計コードは `stats` へ分岐して、共通の成果物契約に統合する。 |
-| [`code-understanding-pyramid`](./.agents/skills/code-understanding-pyramid/SKILL.md) | 3.0.0          | 5段階の理解順序を提供する共通フレームワーク。                                                                                     |
-| [`stats-sql-comprehension`](./.agents/skills/stats-sql-comprehension/SKILL.md)       | 2.0.0          | SQL・dbt・BigQueryとR/Python統計解析の専門アダプター。                                                                            |
+| Skill | 現行バージョン | 役割 |
+| :--- | :---: | :--- |
+| [`code-understanding-pro`](./.agents/skills/code-understanding-pro/SKILL.md) | 2.0.0-ja | 親Skill。対象を判定し、一般コードは `generic`、SQLは `sql`、R/Python統計コードは `stats` へ分岐して、共通の成果物契約に統合する。 |
+| [`code-understanding-pyramid`](./.agents/skills/code-understanding-pyramid/SKILL.md) | 3.0.0 | 5段階の理解順序を提供する共通フレームワーク。 |
+| [`stats-sql-comprehension`](./.agents/skills/stats-sql-comprehension/SKILL.md) | 2.0.0 | SQL・dbt・BigQueryとR/Python統計解析の専門アダプター。 |
 
-現在の正本、責任分担、Skill構成は本READMEと `.agents/skills/` の実体を参照してください。過去の整理履歴は [リポジトリ・Skill正本整理のアーカイブ概要](./docs/Archives/archived_summary_001_0819.md) に保管しています。
+版を公開するSkillでは、`SKILL.md`のfront matterにある`version`を正本とする。`manifest.json`があるSkillでは、その値をfront matterと一致させ、`VERSION`はCLI同梱版など実行時に読むSkillだけが持つ補助情報とする。
+
+過去の整理履歴は [アーカイブ概要](./docs/Archives/README.md) を参照してください。
 
 ---
 
 ## 🚀 はじめに (Getting Started)
 
 本リポジトリ内のスキルはすべて `npx skills` (Agent Skills Standard) に準拠しています。
-本リポジトリを導入することで、プロジェクトや各種エージェントで一元化された高品質なスキルを活用できます。
+本リポジトリを導入することで、各種エージェントで一元化された高品質なスキルを活用できます。
 
 ### インストール方法
 
@@ -41,91 +43,105 @@ npx skills add syrius2000/Productivity-Skill
 npx skills add syrius2000/Productivity-Skill -g
 ```
 
-### 起動方法の統一ルール
+### 起動方法のルール
 
-- 通常のSkillは、自然言語で依頼するとSkillの説明に基づいて自動起動します。各項目の「自然言語トリガー」はその例です。
-- `disable-model-invocation: true` のSkillは自動起動せず、対応クライアントで `/skill-name` のスラッシュコマンドを入力して明示的に起動します。
-- Skillから別Skillを呼ぶ説明中の `/grilling` などは内部連携用です。利用者が最初に入力するコマンドとは区別してください。
+- **自然言語自動起動 (Model-invoked)**: 自然言語で依頼すると、エージェントが状況を判別して自動起動します。
+- **手動コマンド起動 (User-invoked)**: `disable-model-invocation: true` のスキル（`/teach`, `/writing-great-skills` 等）は、常時コンテキストを消費しないよう設計されており、スラッシュコマンド等で明示的に起動します。
 
 ---
 
-## 🛠️ 収録スキル一覧 (9 Skills)
+## 🛠️ 収録スキル一覧 (10 Skills)
 
-### 1. 📊 統計解析＆SQL高度解読
+### 1. 📊 統計解析＆SQL高度解読 (Stats & SQL Suite)
 
 #### 📈 **`stats-sql-comprehension`** (v2.0.0)
-
-- **概要**: 複雑な分析用SQL（dbt, BigQuery, CTE, ウィンドウ関数）や統計解析コード（R, Python）を5段階ピラミッドで解読・可視化・評価するスキル。
+- **概要**: 複雑な分析用SQL（dbt, BigQuery, CTE, ウィンドウ関数）や統計解析コード（R, Python）を5段階ピラミッドで解読・可視化・評価する専門スキル。
 - **特徴**: CTEや結合構造のMermaidリネージ図作成、フルスキャンや多対多結合による行数膨張リスクの検出、統計的バイアス（選択・生存者バイアス等）の検証を行います。
-- **起動方法**: 自然言語で依頼（例：「このSQLを説明して」「クエリを解読して」「dbtモデルを解説して」「データフローを可視化して」「統計コードをレビューして」「SQLのパフォーマンスを評価して」）
+- **利用場面 / 起動例**:
+  - 「このSQLのデータフローと処理ロジックを説明して」
+  - 「BigQuery / dbt モデルのパフォーマンスと結合リスクを評価して」
+  - 「R/Pythonの統計解析コード・前処理の論理妥当性をレビューして」
 
 ---
 
-### 2. 🔍 コード理解・レビュー・リファクタリング
+### 2. 🔍 コード理解・レビュー・リファクタリング (Code Understanding Suite)
 
 #### 📖 **`code-understanding-pro`** (v2.0.0-ja)
-
-- **概要**: 既存コードの段階的理解、詳細解析、コードレビュー、ドキュメント化、安全なリファクタリング支援を包括的に行う日本語スキル。
-- **特徴**: 5段階の「理解のピラミッド」に従い、コードの事実・推測・不確実性・リスクを明確に分離して出力します。
-- **起動方法**: 自然言語で依頼（例：「このコードを説明して」「レビューして」「QAして」「リファクタリング案を出して」「DocStringを書いて」）
+- **概要**: 既存コードの段階的理解、詳細解析、コードレビュー、ドキュメント化、安全なリファクタリング支援を包括的に行う親ルータースキル（日本語完全対応）。
+- **特徴**: 対象コードの性質に応じて `generic` / `sql` / `stats` へ適切にルーティングし、事実・推測・不確実性・リスクを明確に分離したレポートを出力します。
+- **利用場面 / 起動例**:
+  - 「このモジュールの全体構造と振る舞いを解説して」
+  - 「関数のリファクタリング案とDocStringを作成して」
 
 #### 🏛️ **`code-understanding-pyramid`** (v3.0.0)
-
-- **概要**: AIソフトウェアアーキテクトとして、構造把握（準備・概要・詳細・深い理解・活用）を順番に追跡して分析するスキル。
-- **特徴**: 確認できた事実・推測・未解決事項を分離し、関連テストがある場合は仕様・実装と照合したうえで、`[CRITICAL]`, `[CONSIDER]`, `[NIT]`, `[FYI]` のマージ基準付きフィードバックを提供。
-- **起動方法**: 自然言語で依頼（例：「review」「explain」「analyze」などの解析要求）
+- **概要**: 5段階の「理解のピラミッド（準備・概要・詳細・深い理解・活用）」を提供する共通アーキテクチャフレームワーク。
+- **特徴**: 一般コードレビューでは `[Critical]`, `[Major]`, `[Consider]`, `[Nit]`, `[FYI]` の重要度語彙を用い、確証のない推測を排除した客観的レビューを実行します。
+- **利用場面 / 起動例**:
+  - 「コードの深層レビューと構造解析を実行して」
 
 ---
 
-### 3. 🌶️ 思考整理・設計のストレステスト (Grilling)
+### 3. 🛡️ 厳格QMS型QA＆品質ループ (Quality Loop Suite)
+
+#### 🔍 **`quality-review`** (v1.4.0)
+- **概要**: Quality Loop案件において独立レビュアー（Reviewer）として動作し、専用CLI経由で安全に品質検証を行うスキル。
+- **特徴**: 案件正本（`case.json`）の直接改ざんを禁止し、CLIによる状態遷移制御（初回レビュー `review`、計画評価 `review-plan`、独立検証 `verify`、残余リスク評価 `assess-risk`）、申告外変更の機械的遮断（`undeclared-change-detected`）、比例性ゲートを厳格に適用します。
+- **利用場面 / 起動例**:
+  - Quality Loop案件でステータスが `next_role=reviewer` の際に自動起動。
+
+#### ✍️ **`quality-response`** (v1.4.0)
+- **概要**: Quality Loop案件において実装者（Implementer）として動作し、専用CLI経由で計画や修正・反証エビデンスを提出するスキル。
+- **特徴**: いきなり修正せず事前に計画合意を結ぶ「Plan Before Fix」を強制。自己受入・自己クローズを物理的に禁止し、Owner裁定への境界を遵守します。
+- **利用場面 / 起動例**:
+  - Quality Loop案件でステータスが `next_role=implementer` の際に自動起動（`submit-plan`, `submit-response`）。
+
+---
+
+### 4. 🌶️ 思考整理・設計のストレステスト (Grilling)
 
 #### 🔥 **`grilling`**
-
-- **概要**: プラン、意思決定、設計アイデアに対してAIが多角的に「徹底的な1問1答インタビュー」を行う思考検証スキル。
-- **特徴**: 1度に複数質問をせず、対話形式で条件分岐や制約をクリアにしていきます。環境から調べられる事実はAIが調査し、意思決定のみをユーザーに求めます。
-- **起動方法**: 自然言語で依頼（例：設計やプランの検討時に「grill」「面接して」「深掘りして」）
+- **概要**: プラン、意思決定、設計アイデアに対し、AIが「デザインツリー（決定境界のフロンティア）」をラウンド形式で徹底的に面接・質問する思考検証スキル。
+- **特徴**: 調査可能な事実はAI自身が環境から調べ、ユーザーには意思決定のみを問う。未確定の質問群をフロンティアとしてラウンドごとに整理し、思考の抜け漏れを限界まで潰します。
+- **利用場面 / 起動例**:
+  - 設計やプランの検討時に「grill」「面接して」「設計のストレステストをして」「深掘りして」
 
 ---
 
-### 4. 🏗️ ドメインモデル管理
+### 5. 🏗️ ドメインモデリング・ユビキタス言語管理
 
 #### 📘 **`domain-modeling`**
-
-- **概要**: チームやプロジェクト固有の「ユビキタス言語（用語集/Glossary）」およびドメイン構造モデルを整理・保守するスキル。
-- **特徴**: 用語の統一・定義揺れの修正、アーキテクチャ上の決定事項の明確化、ドメイン用語の変更追跡を支援します。
-- **起動方法**: 自然言語で依頼（例：用語集の作成・更新、ドメインモデルの定義）
+- **概要**: チームやプロジェクト固有の用語集（`CONTEXT.md`）およびドメイン構造モデルをアクティブに構築・保守するスキル。
+- **特徴**: 曖昧な言葉遣いや既存用語との不一致をその場で指摘し、真に必要なトレードオフが存在する場合にのみADR（Architecture Decision Record）の作成を提案します。
+- **利用場面 / 起動例**:
+  - 「用語集（Glossary）を作成・更新して」「ドメインモデルを定義して」「用語のブレを指摘して」
 
 ---
 
-### 5. 📚 学習・スキル開発
+### 6. 📚 学習・教育支援
 
 #### 👨‍🏫 **`teach`**
-
-- **概要**: 一方的な解説ではなく、対話形式で段階的に複雑な技術・アルゴリズム・コードの仕組みを教えてくれる教育スキル。
-- **特徴**: ユーザーの知識レベルに合わせて質問を投げかけ、理解度を確認しながらインタラクティブに解説を進行します。
-- **起動方法**: `/teach`（明示起動）
-
-#### 🛠️ **`writing-great-skills`**
-
-- **概要**: エージェント用の新しいスキルを作成・修正する際、TDDアプローチと抜け穴塞ぎ（Bulletproofing）によって高品質なスキルを設計するガイドラインスキル。
-- **特徴**: スキル作成時のベストプラクティス提示、YAMLフロントマター検証、テストケース駆動の設計指導を行います。
-- **起動方法**: `/writing-great-skills`（明示起動）
+- **概要**: 一方的な解説ではなく、対話形式で段階的に技術やコードの仕組みを教え、`./docs/learning/` 配下にポータル（`INDEX.html`）や教材・学習記録を体系的に構築する教育スキル。
+- **利用場面 / 起動例**:
+  - `/teach`（明示起動）: 「〜について体系的に学びたい」「ステップバイステップで教えて」
 
 ---
 
-### 6. 📦 QA・Artifact管理
+### 7. 🛠️ スキル開発・設計メタガイド
 
-#### 🗄️ **`artifacts-archiver`**
+#### 🖋️ **`writing-great-skills`**
+- **概要**: エージェント用の新しいスキルを作成・修正する際、予測可能性（Predictability）、牽引語（Leading Words）、情報階層・段階的開示（Progressive Disclosure）、No-op枝刈り等を用いて高品質に仕上げるためのメタスキル。
+- **利用場面 / 起動例**:
+  - `/writing-great-skills`（明示起動）: 新しいスキルの設計・作成、既存スキルのリファクタリング
 
-- **概要**: `docs/Artifacts/` の完了済み計画・報告を対象期間付きの概要へ統合し、`docs/Archives/` へ整理するスキル。
-- **特徴**: 過去の複数アーティファクトを要約統合し、進行中計画のID採番を維持しながら古い成果物を安全にアーカイブします。
-- **起動方法**: 自然言語で依頼（例：「過去のPlanをアーカイブして」「成果物を整理して」）
+---
 
-#### 🔍 **`spec-driven-qa-review`**
+### 8. 🗄️ ドキュメント管理・自動アーカイブ
 
-- **概要**: Purpose、Spec、Plan、Implementation、Tests、Evidenceを独立に照合し、Finding・トレーサビリティ・レビューサイクルを記録するスキル。
-- **特徴**: 仕様と実装の乖離検出、見逃しがちな懸念点の発見、マルチサイクル/シングルサイクルのレビュー検証と追跡を実施します。
-- **起動方法**: 自然言語で依頼（例：「指定ファイルのQAレビューを実施して」「仕様との照合チェックをして」）
+#### 🗃️ **`artifacts-archiver`**
+- **概要**: `./docs/Artifacts/` 内の完了済み計画書や報告書を精査し、対象期間を明記したまとめ文書へ集約して `./docs/Archives/` へ退避するスキル。
+- **特徴**: アクティブな計画書のファイル名・連番を保持しつつ、過去の書類群を原則1〜2本のサマリー文書へ圧縮整理します。
+- **利用場面 / 起動例**:
+  - 「Artifactsを整理して」「過去の計画書をアーカイブして」「古い書類をまとめて」
 
 ---
 
@@ -134,17 +150,21 @@ npx skills add syrius2000/Productivity-Skill -g
 ```text
 .
 ├── .agents/
-│   └── skills/                  # エージェントスキル格納フォルダ
-│       ├── artifacts-archiver/
-│       ├── code-understanding-pro/
-│       ├── code-understanding-pyramid/
-│       ├── domain-modeling/
-│       ├── grilling/
-│       ├── spec-driven-qa-review/
-│       ├── stats-sql-comprehension/
-│       ├── teach/
-│       └── writing-great-skills/
-├── docs/                        # プロジェクトドキュメント
+│   └── skills/                  # エージェントスキル格納フォルダ (10 Skills)
+│       ├── artifacts-archiver/       # ドキュメント自動アーカイブ
+│       ├── code-understanding-pro/   # コード理解・親ルーター (v2.0.0-ja)
+│       ├── code-understanding-pyramid/# 5段階理解ピラミッド (v3.0.0)
+│       ├── domain-modeling/          # ドメイン用語集・ADR管理
+│       ├── grilling/                 # 思考・設計ストレステスト面接
+│       ├── quality-response/         # QMS型QA・実装者回答 (v1.4.0)
+│       ├── quality-review/           # QMS型QA・独立レビュー (v1.4.0)
+│       ├── stats-sql-comprehension/  # 統計＆SQL高度解読 (v2.0.0)
+│       ├── teach/                    # 対話型教育ポータル構築
+│       └── writing-great-skills/     # スキル設計・作成メタガイド
+├── docs/
+│   ├── Archives/                # 過去サマリー文書・ZIPアーカイブ
+│   └── Artifacts/               # アクティブ作業用計画・報告書
+├── tests/                       # リポジトリ保守・契約検証テスト
 └── README.md
 ```
 
@@ -152,7 +172,4 @@ npx skills add syrius2000/Productivity-Skill -g
 
 ## 📜 ライセンス
 
-本リポジトリ全体のライセンスは定義していません。各スキルに同梱された
-`SKILL.md`、`LICENSE`、`LICENSE.txt` 等の記載を確認してください。
-たとえば、`code-understanding-pro` は `Internal Use License`、
-`stats-sql-comprehension` は `MIT` と定義されています。
+本リポジトリ全体のライセンスは定義していません。各スキルに同梱された `SKILL.md`、`LICENSE`、`LICENSE.txt` 等の記載を確認してください。
