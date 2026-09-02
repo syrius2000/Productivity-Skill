@@ -22,6 +22,8 @@ AI コーディングエージェント（Antigravity, Cursor, Claude Code, Code
 | [`code-understanding-pyramid`](./.agents/skills/code-understanding-pyramid/SKILL.md) | 3.0.0 | 5段階の理解順序を提供する共通フレームワーク。 |
 | [`stats-sql-comprehension`](./.agents/skills/stats-sql-comprehension/SKILL.md) | 2.0.0 | SQL・dbt・BigQueryとR/Python統計解析の専門アダプター。 |
 
+版を公開するSkillでは、`SKILL.md`のfront matterにある`version`を正本とする。`manifest.json`があるSkillでは、その値をfront matterと一致させ、`VERSION`はCLI同梱版など実行時に読むSkillだけが持つ補助情報とする。
+
 過去の整理履歴は [アーカイブ概要](./docs/Archives/README.md) を参照してください。
 
 ---
@@ -73,7 +75,7 @@ npx skills add syrius2000/Productivity-Skill -g
 
 #### 🏛️ **`code-understanding-pyramid`** (v3.0.0)
 - **概要**: 5段階の「理解のピラミッド（準備・概要・詳細・深い理解・活用）」を提供する共通アーキテクチャフレームワーク。
-- **特徴**: `[CRITICAL]`, `[CONSIDER]`, `[NIT]`, `[FYI]` のマージ基準付きフィードバックを提供し、確証のない推測を排除した客観的レビューを実行します。
+- **特徴**: 一般コードレビューでは `[Critical]`, `[Major]`, `[Consider]`, `[Nit]`, `[FYI]` の重要度語彙を用い、確証のない推測を排除した客観的レビューを実行します。
 - **利用場面 / 起動例**:
   - 「コードの深層レビューと構造解析を実行して」
 

@@ -9,9 +9,19 @@ SKILL_DIR = Path(__file__).resolve().parents[1]
 VALIDATOR = SKILL_DIR / "scripts" / "validate_report.py"
 
 
-def run_validator(path: Path, adapter: str = "generic") -> subprocess.CompletedProcess[str]:
+def run_validator(
+    path: Path, adapter: str = "generic", complexity: str = "simple"
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, str(VALIDATOR), str(path), "--adapter", adapter],
+        [
+            sys.executable,
+            str(VALIDATOR),
+            str(path),
+            "--adapter",
+            adapter,
+            "--complexity",
+            complexity,
+        ],
         text=True,
         capture_output=True,
         check=False,
@@ -110,6 +120,33 @@ def test_validator_rejects_unclosed_mermaid_block(tmp_path: Path) -> None:
     report = tmp_path / "report.md"
     report.write_text(valid_report().replace("```\n\n## 詳細", "\n\n## 詳細", 1), encoding="utf-8")
     result = run_validator(report)
+    assert result.returncode != 0
+    assert "Mermaid" in result.stderr
+
+
+def test_validator_accepts_textual_flow_for_simple_report(tmp_path: Path) -> None:
+    report = tmp_path / "report.md"
+    report.write_text(
+        valid_report().replace(
+            "```mermaid\nflowchart TD\n  A[入力] --> B[検証] --> C[出力]\n```",
+            "入力を受け取り、検証してから出力します。",
+        ),
+        encoding="utf-8",
+    )
+    result = run_validator(report, complexity="simple")
+    assert result.returncode == 0, result.stderr
+
+
+def test_validator_requires_mermaid_for_complex_report(tmp_path: Path) -> None:
+    report = tmp_path / "report.md"
+    report.write_text(
+        valid_report().replace(
+            "```mermaid\nflowchart TD\n  A[入力] --> B[検証] --> C[出力]\n```",
+            "入力を受け取り、検証してから出力します。",
+        ),
+        encoding="utf-8",
+    )
+    result = run_validator(report, complexity="complex")
     assert result.returncode != 0
     assert "Mermaid" in result.stderr
 

@@ -1,6 +1,6 @@
 {
   "name": "code-understanding-pro",
-  "version": "2.0.0-ja",
+  "version": "2.1.0-ja",
   "language": "ja",
   "description": "コード理解スイートの親Skill。汎用、SQL、統計コードの深い解析を共通Markdown成果物へ保存する。",
   "entrypoint": "SKILL.md",

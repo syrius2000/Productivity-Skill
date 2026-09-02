@@ -54,7 +54,27 @@ def mermaid_blocks_are_balanced(markdown: str) -> bool:
     return found and not in_mermaid
 
 
-def validate_report(markdown: str, adapter: str) -> list[str]:
+def textual_flow_is_present(markdown: str) -> bool:
+    match = re.search(
+        r"^##\s+処理フロー\s*$([\s\S]*?)(?=^##\s+|\Z)",
+        markdown,
+        re.MULTILINE,
+    )
+    if not match:
+        return False
+    if "```mermaid" in match.group(1):
+        return False
+    body = re.sub(r"```mermaid[\s\S]*?```", "", match.group(1), flags=re.MULTILINE)
+    return bool(body.strip())
+
+
+def diagram_or_textual_flow_is_valid(markdown: str, complexity: str) -> bool:
+    if mermaid_blocks_are_balanced(markdown):
+        return True
+    return complexity == "simple" and textual_flow_is_present(markdown)
+
+
+def validate_report(markdown: str, adapter: str, complexity: str = "simple") -> list[str]:
     errors: list[str] = []
     if not re.search(r"^#\s+\S", markdown, re.MULTILINE):
         errors.append("H1タイトルがありません")
@@ -70,8 +90,11 @@ def validate_report(markdown: str, adapter: str) -> list[str]:
         for section in STATS_SECTIONS:
             if section not in present:
                 errors.append(f"統計必須節がありません: {section}")
-    if not mermaid_blocks_are_balanced(markdown):
-        errors.append("Mermaidコードブロックがないか、閉じられていません")
+    if not diagram_or_textual_flow_is_valid(markdown, complexity):
+        if complexity == "complex":
+            errors.append("複雑なレポートには閉じたMermaidコードブロックが必要です")
+        else:
+            errors.append("処理フローにMermaidまたは説明テキストが必要です")
     evidence_match = re.search(
         r"^##\s+根拠ファイル・行番号\s*$([\s\S]*?)(?=^##\s+|\Z)",
         markdown,
@@ -86,6 +109,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="コード理解Markdownレポートを検証します")
     parser.add_argument("report", type=Path)
     parser.add_argument("--adapter", choices=("generic", "sql", "stats"), default="generic")
+    parser.add_argument(
+        "--complexity",
+        choices=("simple", "complex"),
+        default="simple",
+        help="処理フローの複雑度。complexではMermaidを必須にします",
+    )
     return parser.parse_args()
 
 
@@ -96,7 +125,7 @@ def main() -> int:
     except (OSError, UnicodeError) as error:
         print(f"エラー: {error}", file=sys.stderr)
         return 1
-    errors = validate_report(markdown, args.adapter)
+    errors = validate_report(markdown, args.adapter, args.complexity)
     if errors:
         for error in errors:
             print(f"エラー: {error}", file=sys.stderr)
