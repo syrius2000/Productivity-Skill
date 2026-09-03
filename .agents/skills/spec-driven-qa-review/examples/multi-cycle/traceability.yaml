@@ -1,0 +1,22 @@
+schema_version: "1.0"
+case_id: QA-0002
+claims:
+  - id: CLAIM-010
+    statement: Transient 503 responses are retried at most three times with backoff.
+    source: {type: specification, reference: REQ-RETRY-01}
+    plan_refs: [PLAN-RETRY]
+    task_refs: [TASK-11]
+    implementation:
+      - {path: src/client/retry.py, symbol: retry_request, revision: d7e8f9a}
+    evidence:
+      - {id: EVID-010, type: test, reference: tests/test_retry.py::test_retry_is_bounded}
+    assessment: {result: supported, confidence: high, rationale: Bounded retry is directly exercised.}
+  - id: CLAIM-011
+    statement: Retried POST operations do not duplicate external effects.
+    source: {type: specification, reference: REQ-IDEMP-01}
+    plan_refs: [PLAN-RETRY]
+    task_refs: [TASK-12]
+    implementation:
+      - {path: src/client/api.py, symbol: post_with_retry, revision: d7e8f9a}
+    evidence: []
+    assessment: {result: unsupported, confidence: high, rationale: No idempotency evidence is available.}

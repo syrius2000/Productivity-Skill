@@ -1,0 +1,89 @@
+schema_version: "1.0"
+case_id: QA-0001
+claims:
+  - id: CLAIM-001
+    statement: "2つのグローバルSkillを生成物を除く完全パッケージとしてリポジトリ内で管理する。"
+    source:
+      type: plan
+      reference: "docs/Artifacts/implementation_plan_012_0819.md:7-9,27-31"
+    plan_refs: [PLAN-012-PLACEMENT]
+    task_refs: ["第1段階1-4"]
+    implementation:
+      - path: ".agents/skills/artifacts-archiver/"
+        symbol: null
+        revision: "未配置"
+      - path: ".agents/skills/spec-driven-qa-review/"
+        symbol: null
+        revision: "未配置"
+    evidence:
+      - id: EVID-001
+        type: static-analysis
+        reference: "~/.agents/skills/spec-driven-qa-review/MANIFEST.txtと生成物除外後のファイル一覧"
+        result: supported
+    assessment:
+      result: supported
+      confidence: high
+      rationale: "改善後はMANIFESTと配置先の59ファイルが一致し、生成物除外規則をスクリプトとテストで検証できる。"
+
+  - id: CLAIM-002
+    statement: "READMEと現行状態文書を実体に一致させ、文書責任分担を維持する。"
+    source:
+      type: plan
+      reference: "docs/Artifacts/implementation_plan_012_0819.md:33-38,87-92"
+    plan_refs: [PLAN-012-DOC-UPDATE]
+    task_refs: ["第1段階", "第4段階"]
+    implementation:
+      - path: "README.md"
+        symbol: null
+        revision: "WORKTREE@bc05359"
+      - path: "docs/Artifacts/repository_current_state_012_0724.md"
+        symbol: null
+        revision: "存在しない"
+    evidence:
+      - id: EVID-002
+        type: runtime
+        reference: "README.md:25の参照先存在確認とdocs/Archives/archived_summary_001_0819.md"
+        result: supported
+    assessment:
+      result: supported
+      confidence: high
+      rationale: "旧Artifactを再作成せず、READMEの現行参照をアーカイブ概要へ修正し、リンク存在を確認した。"
+
+  - id: CLAIM-003
+    statement: "spec-driven-qa-reviewの改善効果を改善前後の再現可能な証拠で評価する。"
+    source:
+      type: plan
+      reference: "docs/Artifacts/implementation_plan_012_0819.md:40-50,61-85"
+    plan_refs: [PLAN-012-IMPROVEMENT-EVALUATION]
+    task_refs: ["第2段階", "第3段階", "第4段階"]
+    implementation:
+      - path: "~/.agents/skills/spec-driven-qa-review/"
+        symbol: null
+        revision: "提供元0.1.0相当"
+    evidence:
+      - id: EVID-003
+        type: specification
+        reference: "~/.agents/skills/skill-creator/SKILL.mdの評価手順"
+        result: partially-supported
+    assessment:
+      result: partially-supported
+      confidence: medium
+      rationale: "評価契約、期待結果、Assertionまたは定性的判定、証拠保存先を追加した。ただし別AIによる完全な比較評価は残余リスクである。"
+
+  - id: CLAIM-004
+    statement: "配置・実装・Git操作・外部書き込みを承認境界で分離する。"
+    source:
+      type: plan
+      reference: "docs/Artifacts/implementation_plan_012_0819.md:87-107"
+    plan_refs: [PLAN-012-APPROVAL]
+    task_refs: []
+    implementation: []
+    evidence:
+      - id: EVID-004
+        type: code-inspection
+        reference: "計画書98〜105行目の承認境界"
+        result: supported
+    assessment:
+      result: supported
+      confidence: high
+      rationale: "計画書は承認前の調査・計画作成と、承認後の配置・変更・Git操作を明確に区別している。"

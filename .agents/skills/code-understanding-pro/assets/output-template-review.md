@@ -1,5 +1,7 @@
 # コードレビュー結果
 
+> 複雑度が `simple` の場合は、Mermaidの代わりに文章または箇条書きの処理フローを記載する。`complex` の場合はMermaidを使用する。
+
 > 保存先: `skill_out/code_understanding/<target>/run_<id>/report.md`
 
 ## 結論
@@ -37,7 +39,7 @@ flowchart TD
 
 | 重要度 | 場所 | 根拠 | 修正案 |
 |---|---|---|---|
-| Critical / Major / Consider / Nit |  |  |  |
+| Critical / Major / Consider / Nit / FYI |  |  |  |
 
 ### 追加すべきテスト
 

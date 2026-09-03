@@ -1,0 +1,44 @@
+schema_version: "1.0"
+case_id: QA-0002
+findings:
+  - id: QA-0002-F01
+    title: Retry includes 503 without bounded backoff evidence
+    category: evidence-gap
+    severity: high
+    severity_rationale: Unbounded or inappropriate retry can amplify an external outage.
+    status: fixed-and-verified
+    first_seen_cycle: 1
+    claim_refs: [CLAIM-010]
+    requirement_refs: [REQ-RETRY-01]
+    evidence:
+      - type: test
+        reference: tests/test_retry.py::test_retry_is_bounded
+        revision: d7e8f9a
+    limitations: []
+    requested_action: Bound retry and add executable evidence.
+    fingerprint:
+      category: evidence-gap
+      requirement_id: REQ-RETRY-01
+      primary_path: src/client/retry.py
+      semantic_key: bounded-retry-503
+  - id: QA-0002-F02
+    title: POST replay idempotency is not established
+    category: unverified-assumption
+    severity: high
+    severity_rationale: Duplicate side effects could corrupt external state.
+    status: open
+    first_seen_cycle: 2
+    claim_refs: [CLAIM-011]
+    requirement_refs: [REQ-IDEMP-01]
+    evidence:
+      - type: code
+        reference: src/client/api.py::post_with_retry
+        revision: d7e8f9a
+    limitations:
+      - External provider behavior is not demonstrated.
+    requested_action: Provide idempotency-key implementation plus test/provider contract evidence, or require adjudication.
+    fingerprint:
+      category: unverified-assumption
+      requirement_id: REQ-IDEMP-01
+      primary_path: src/client/api.py
+      semantic_key: post-replay-idempotency

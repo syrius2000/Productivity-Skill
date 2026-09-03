@@ -1,0 +1,11 @@
+purpose:
+  id: PURPOSE-001
+  title: "REQUIRED:HUMAN-INPUT:PURPOSE-TITLE"
+  problem:
+    statement: "REQUIRED:HUMAN-INPUT:PROBLEM"
+  intended_outcome:
+    - "REQUIRED:HUMAN-INPUT:OUTCOME"
+  success_criteria:
+    - "REQUIRED:HUMAN-INPUT:SUCCESS-CRITERION"
+  non_goals: []
+  unacceptable_risks: []

@@ -1,0 +1,29 @@
+schema_version: "1.0"
+case_id: QA-0001
+findings:
+  - id: QA-0001-F01
+    title: Missing-ID rejection had no regression test
+    category: evidence-gap
+    severity: medium
+    severity_rationale: The implementation appeared correct but could regress without executable evidence.
+    status: fixed-and-verified
+    first_seen_cycle: 1
+    claim_refs: [CLAIM-001]
+    requirement_refs: [REQ-014]
+    evidence:
+      - type: test
+        reference: tests/test_patient_validation.py::test_missing_patient_id_is_rejected
+        revision: c4d5e6f
+    limitations: []
+    requested_action: Add a regression test and verify it.
+    fingerprint:
+      category: evidence-gap
+      requirement_id: REQ-014
+      primary_path: src/validation/patient.py
+      semantic_key: missing-patient-id-rejection
+    author_response:
+      disposition: fix-submitted
+      revision: c4d5e6f
+    verification:
+      result: fixed-and-verified
+      revision: c4d5e6f
