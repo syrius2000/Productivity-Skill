@@ -26,6 +26,32 @@ def build_parser() -> argparse.ArgumentParser:
     create = subparsers.add_parser("create-case")
     create.add_argument("--input", required=True)
 
+    standalone = subparsers.add_parser(
+        "review-standalone",
+        help="対象ファイルからReviewer向け案件をbootstrapする",
+    )
+    standalone.set_defaults(targets=[])
+    standalone.add_argument(
+        "--target",
+        dest="targets",
+        action="append",
+        help="レビュー対象の通常ファイル（複数指定可）",
+    )
+    standalone.add_argument(
+        "--artifact",
+        dest="targets",
+        action="append",
+        help="レビュー対象Artifact（--targetの別名、複数指定可）",
+    )
+    standalone.add_argument("--owner", required=True)
+    standalone.add_argument("--case-id", default=None)
+    standalone.add_argument("--baseline-input", default=None)
+    standalone.add_argument(
+        "--criticality",
+        choices=("low", "medium", "high", "regulated"),
+        default=None,
+    )
+
     for command in ("review", "submit-plan", "review-plan", "submit-response", "verify", "assess-risk", "adjudicate"):
         operation = subparsers.add_parser(command)
         operation.add_argument("--case-id", required=False, default=None)
@@ -101,6 +127,25 @@ def run(argv: list[str] | None = None) -> int:
         loop = QualityLoop(args.case_root)
         if args.command == "create-case":
             result = loop.create_case(read_payload(args.input))
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
+
+        if args.command == "review-standalone":
+            baseline_input = (
+                read_payload(args.baseline_input)
+                if args.baseline_input is not None
+                else None
+            )
+            case_id = args.case_id
+            result = loop.review_standalone(
+                {
+                    "targets": args.targets,
+                    "owner": args.owner,
+                    "case_id": args.case_id,
+                    "baseline": baseline_input,
+                    "criticality": args.criticality,
+                }
+            )
             print(json.dumps(result, ensure_ascii=False, indent=2))
             return 0
 

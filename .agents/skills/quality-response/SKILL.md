@@ -1,6 +1,7 @@
 ---
 name: quality-response
 description: 明示されたQuality Loop案件で、statusがnext_role=implementerかつnext_action=submit-planまたはsubmit-responseを示す場合だけ使用する。一般的な回答作成、一般的なQA、OpenSpec案件一般、レビュー、独立検証、Owner裁定、自己クローズには使用しない。closed変更は情報の有無にかかわらずRole外として拒否する。
+version: "1.4.0"
 ---
 
 # Quality Response

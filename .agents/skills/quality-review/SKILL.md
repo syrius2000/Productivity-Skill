@@ -1,6 +1,7 @@
 ---
 name: quality-review
-description: 明示されたQuality Loop案件で、statusがnext_role=reviewerを示し、review、review-plan、verify、assess-riskを行う場合だけ使用する。一般的なコードレビュー、一般的なQA、OpenSpec案件一般、回答代筆、実装、Owner裁定、自己クローズには使用しない。申告外変更はundeclared-change-detectedとして拒否する。
+description: 明示されたQuality Loop案件でReviewer工程（review、review-plan、verify、assess-risk）を行う場合、またはcase情報がない状態で明示された対象から単発QAのreview-standalone bootstrapを開始する場合に使用する。一般的なコードレビュー、一般的なQA、OpenSpec案件一般、回答代筆、実装、Owner裁定、自己クローズには使用しない。申告外変更はundeclared-change-detectedとして拒否する。
+version: "1.5.0"
 ---
 
 # Quality Review
@@ -36,6 +37,7 @@ description: 明示されたQuality Loop案件で、statusがnext_role=reviewer�
 8. このSkillディレクトリ内の`bin/quality-review-cli`を、呼出し元の作業ディレクトリを変更せずに実行する。
 
 ```text
+<quality-review-skill-dir>/bin/quality-review-cli --case-root <case-root> review-standalone --target <file> --owner <owner>
 <quality-review-skill-dir>/bin/quality-review-cli --case-root <case-root> review --case-id <case-id> --input <json/file>
 <quality-review-skill-dir>/bin/quality-review-cli --case-root <case-root> review-plan --case-id <case-id> --input <json/file>
 <quality-review-skill-dir>/bin/quality-review-cli --case-root <case-root> verify --case-id <case-id> --input <json/file>
@@ -45,6 +47,17 @@ description: 明示されたQuality Loop案件で、statusがnext_role=reviewer�
 9. 成功JSONの`next_role`、`next_action`、`handoff`をそのまま次工程へ示す。失敗時は`error_code`と`remediation`を示し、正本を迂回編集しない。
 
 実案件、case-root、現在handoffが提供されていない評価・相談ではCLI成功やhandoffを捏造しない。必要入力と実行すべき次操作だけを示す。
+
+## case情報がない場合の単発入口
+
+対象Artifactまたは対象ファイルが明示され、正式case情報がまだない場合だけ、`review-standalone`をbootstrapとして使用する。入力契約の詳細は[standalone-review-input.schema.json](references/standalone-review-input.schema.json)を参照する。
+
+1. `--target`または`--artifact`で通常ファイルを1個以上、`--owner`で登録Ownerを指定して`review-standalone`を実行する。ディレクトリの再帰展開は行わない。対象manifestは最大32ファイル、1ファイル10 MiB、合計50 MiBまでで、SHA-256はストリーミング計算する。
+2. 返された`case_id`、`case_revision`、`handoff`を確認する。成功時はrevision 1、`next_role=reviewer`、`next_action=review`である。
+3. 対象、baseline、利用可能なEvidenceを自分で確認し、Findingを作成する。原要求が提示されていない場合は適合を推測せず、必要に応じて`evidence-gap`または`unverified`とする。
+4. 返されたhandoff IDとrevisionを使い、通常の`review`を1回実行する。Finding、Evidence、次工程handoffは通常の`review`結果だけを正式結果とする。
+
+`review-standalone`自体はFinding、品質適合、受入、実装許可、Owner裁定を生成しない。既存caseを自動選択せず、対象成果物も変更しない。同じ対象を再送する場合は返却されたcaseを確認し、別案件として開始したい場合だけ`--case-id`を分ける。
 
 ## 初回レビュー
 

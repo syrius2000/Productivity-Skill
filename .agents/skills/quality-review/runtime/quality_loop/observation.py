@@ -8,7 +8,19 @@ from pathlib import Path
 from .errors import QualityLoopError
 
 
-def compute_file_manifest(scope_paths: list[str]) -> dict[str, str]:
+MANIFEST_CHUNK_BYTES = 1024 * 1024
+MAX_MANIFEST_FILES = 32
+MAX_MANIFEST_FILE_BYTES = 10 * 1024 * 1024
+MAX_MANIFEST_TOTAL_BYTES = 50 * 1024 * 1024
+
+
+def compute_file_manifest(
+    scope_paths: list[str],
+    *,
+    max_files: int = MAX_MANIFEST_FILES,
+    max_file_bytes: int = MAX_MANIFEST_FILE_BYTES,
+    max_total_bytes: int = MAX_MANIFEST_TOTAL_BYTES,
+) -> dict[str, str]:
     """指定済みの有限ファイル集合をSHA-256で記録する。
 
     対象集合は呼出し側が明示する。存在しないファイルや読取り不能なファイルを
@@ -23,9 +35,33 @@ def compute_file_manifest(scope_paths: list[str]) -> dict[str, str]:
             exit_code=3,
         )
 
+    unique_paths = sorted(set(scope_paths))
+    if len(unique_paths) > max_files:
+        raise QualityLoopError(
+            "manifest-too-many-targets",
+            f"manifest対象が多すぎます（上限: {max_files}ファイル）。",
+            exit_code=3,
+            remediation="対象を明示的な少数ファイルへ絞って再実行してください。",
+        )
+
     manifest: dict[str, str] = {}
-    for path_str in sorted(set(scope_paths)):
+    total_bytes = 0
+    for path_str in unique_paths:
         path = Path(path_str)
+        if path.is_symlink():
+            raise QualityLoopError(
+                "manifest-target-not-regular",
+                f"manifest対象にシンボリックリンクは指定できません: {path_str}",
+                exit_code=3,
+                remediation="リンク先ではなく、対象の通常ファイルを明示してください。",
+            )
+        if path.is_dir():
+            raise QualityLoopError(
+                "manifest-target-directory",
+                f"manifest対象にディレクトリは指定できません: {path_str}",
+                exit_code=3,
+                remediation="ディレクトリではなく、対象ファイルを明示してください。",
+            )
         if not path.is_file():
             raise QualityLoopError(
                 "manifest-target-not-found",
@@ -34,7 +70,53 @@ def compute_file_manifest(scope_paths: list[str]) -> dict[str, str]:
                 remediation="対象パスを確認し、削除済みファイルはGit観測で確認してください。",
             )
         try:
-            manifest[str(path)] = hashlib.sha256(path.read_bytes()).hexdigest()
+            file_size = path.stat().st_size
+            if file_size > max_file_bytes:
+                raise QualityLoopError(
+                    "manifest-target-too-large",
+                    f"manifest対象ファイルが大きすぎます（上限: {max_file_bytes} bytes）: {path_str}",
+                    exit_code=3,
+                    remediation="対象を分割するか、上限内の対象を明示してください。",
+                )
+            if total_bytes + file_size > max_total_bytes:
+                raise QualityLoopError(
+                    "manifest-targets-too-large",
+                    f"manifest対象の合計サイズが大きすぎます（上限: {max_total_bytes} bytes）。",
+                    exit_code=3,
+                    remediation="対象数または対象サイズを絞って再実行してください。",
+                )
+
+            digest = hashlib.sha256()
+            actual_size = 0
+            with path.open("rb") as handle:
+                while chunk := handle.read(MANIFEST_CHUNK_BYTES):
+                    actual_size += len(chunk)
+                    if actual_size > max_file_bytes:
+                        raise QualityLoopError(
+                            "manifest-target-too-large",
+                            f"manifest対象ファイルが読み取り中に上限を超えました（上限: {max_file_bytes} bytes）: {path_str}",
+                            exit_code=3,
+                            remediation="対象を分割するか、上限内の対象を明示してください。",
+                        )
+                    if total_bytes + actual_size > max_total_bytes:
+                        raise QualityLoopError(
+                            "manifest-targets-too-large",
+                            f"manifest対象の合計サイズが読み取り中に上限を超えました（上限: {max_total_bytes} bytes）。",
+                            exit_code=3,
+                            remediation="対象数または対象サイズを絞って再実行してください。",
+                        )
+                    digest.update(chunk)
+            if actual_size != file_size:
+                raise QualityLoopError(
+                    "manifest-target-changed-during-read",
+                    f"manifest対象のサイズが読み取り中に変化しました: {path_str}",
+                    exit_code=3,
+                    remediation="対象の変更を止めてから再実行してください。",
+                )
+            manifest[str(path)] = digest.hexdigest()
+            total_bytes += actual_size
+        except QualityLoopError:
+            raise
         except OSError as exc:
             raise QualityLoopError(
                 "manifest-target-unreadable",

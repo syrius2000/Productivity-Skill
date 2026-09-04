@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -11,6 +13,7 @@ from .errors import QualityLoopError
 from .evidence import validate_evidence
 from .handoff import issue_handoff, terminal_handoff
 from .model import RESOLVED_VERIFICATION_RESULTS, validate_findings
+from .observation import compute_file_manifest
 from .transitions import ALLOWED_FIELDS, EXPECTED_ROLE, EXPECTED_STATE
 
 
@@ -24,6 +27,45 @@ def utc_now() -> str:
 class QualityLoop:
     def __init__(self, case_root: Path) -> None:
         self.store = CaseStore(case_root)
+
+    def review_standalone(self, payload: dict) -> dict:
+        """明示対象から正式Reviewer案件を開始するbootstrap入口。"""
+        normalized = self._normalize_standalone(payload)
+        case_id = normalized["case_id"]
+        existing_path = self.store.case_path(case_id)
+        if existing_path.is_file():
+            current = self.store.load(case_id)
+            if not self._standalone_case_matches(current, normalized):
+                raise QualityLoopError(
+                    "standalone-case-mismatch",
+                    f"案件 {case_id} は異なる対象またはbaselineで既に存在します。",
+                    exit_code=3,
+                    remediation="別のcase-idを指定するか、既存caseのstatusを確認してください。",
+                )
+
+        create_payload = {
+            "operation_id": f"standalone-create-{normalized['fingerprint'][:32]}",
+            "actor_id": normalized["owner"],
+            "role": "owner",
+            "invocation_id": f"standalone-invocation-{normalized['fingerprint'][:32]}",
+            "case_id": case_id,
+            "owner": normalized["owner"],
+            "baseline": normalized["baseline"],
+            "implementation_authorization": {
+                "allowed": False,
+                "finding_ids": [],
+                "allowed_targets": [],
+            },
+            "change_observation": normalized["change_observation"],
+        }
+        result = self.create_case(create_payload)
+        result["entrypoint"] = "review-standalone"
+        result["review_context"] = {
+            "case_root": str(self.store.case_root),
+            "targets": list(normalized["targets"]),
+            "baseline_source": normalized["baseline_source"],
+        }
+        return result
 
     def create_case(self, payload: dict) -> dict:
         self._validate_create(payload)
@@ -988,6 +1030,175 @@ class QualityLoop:
             self.store.atomic_write_text(self.store.case_dir(case_id) / "resume.md", text)
             result["resume_path"] = "resume.md"
         return result
+
+    @staticmethod
+    def _normalize_standalone(payload: dict) -> dict:
+        if not isinstance(payload, dict):
+            raise QualityLoopError(
+                "invalid-input",
+                "review-standalone入力はobjectで指定してください。",
+            )
+
+        owner = payload.get("owner")
+        if not isinstance(owner, str) or not owner.strip():
+            raise QualityLoopError(
+                "invalid-input",
+                "review-standaloneにはownerが必要です。",
+            )
+
+        raw_targets = payload.get("targets")
+        if not isinstance(raw_targets, list) or not raw_targets:
+            raise QualityLoopError(
+                "invalid-standalone-targets",
+                "レビュー対象ファイルを--targetまたは--artifactで1個以上指定してください。",
+                exit_code=3,
+            )
+        if any(not isinstance(item, str) or not item.strip() for item in raw_targets):
+            raise QualityLoopError(
+                "invalid-standalone-targets",
+                "レビュー対象は空文字を含まない文字列配列で指定してください。",
+                exit_code=3,
+            )
+
+        targets = sorted({str(Path(item).expanduser().absolute()) for item in raw_targets})
+        manifest = compute_file_manifest(targets)
+        fingerprint_payload = {"targets": targets, "manifest": manifest}
+        fingerprint = hashlib.sha256(
+            json.dumps(
+                fingerprint_payload,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+
+        case_id = payload.get("case_id")
+        if case_id is None:
+            case_id = f"standalone-{fingerprint[:32]}"
+        if not isinstance(case_id, str) or not CASE_ID_PATTERN.fullmatch(case_id):
+            raise QualityLoopError(
+                "invalid-case-id",
+                "case_idは英数字で始まる英数字・ドット・ハイフン・下線だけを使用してください。",
+                exit_code=2,
+                remediation="安全なcase_idへ変更してください。",
+            )
+
+        criticality = payload.get("criticality") or "low"
+        if criticality not in {"low", "medium", "high", "regulated"}:
+            raise QualityLoopError(
+                "invalid-input",
+                "criticalityが不正です（対応値: low, medium, high, regulated）。",
+            )
+
+        baseline_input = payload.get("baseline")
+        if baseline_input is not None and not isinstance(baseline_input, dict):
+            raise QualityLoopError(
+                "invalid-input",
+                "baseline-inputはobjectで指定してください。",
+            )
+        if baseline_input is not None:
+            allowed_baseline_fields = {
+                "purpose",
+                "intended_use",
+                "risk_context",
+                "requirements",
+                "acceptance_criteria",
+                "constraints",
+                "applicable_obligations",
+                "unacceptable_failures",
+                "exclusions",
+                "targets",
+                "target_revision",
+            }
+            forbidden = sorted(set(baseline_input) - allowed_baseline_fields)
+            if forbidden:
+                raise QualityLoopError(
+                    "forbidden-field",
+                    "baseline-inputが許可していない項目を含んでいます: "
+                    + ", ".join(forbidden),
+                    remediation="baseline-inputにはQuality Intentの項目だけを指定してください。",
+                )
+
+        default_exclusion = (
+            "原要求・原受入基準が未提示の場合、ドメイン適合や受入を判定しない"
+        )
+        baseline = {
+            "purpose": "指定対象の実装結果を単発で独立QAする",
+            "intended_use": {
+                "users": "依頼者が指定する利用者（未指定）",
+                "environment": "依頼者が指定する環境（未指定）",
+                "operational_context": "単発の実装結果QA",
+            },
+            "risk_context": {
+                "criticality": criticality,
+                "safety_impact": "未指定",
+                "data_integrity_impact": "未指定",
+                "security_context": "未指定",
+            },
+            "requirements": [
+                {
+                    "requirement_id": "STANDALONE-SCOPE-001",
+                    "text": "指定対象の範囲と確認可能なEvidenceを明示する",
+                }
+            ],
+            "acceptance_criteria": [
+                "レビュー範囲、確認結果、未確認事項が記録されること"
+            ],
+            "exclusions": [default_exclusion],
+            "targets": targets,
+            "target_revision": f"standalone-sha256:{fingerprint}",
+        }
+        if baseline_input is not None:
+            baseline.update(deepcopy(baseline_input))
+            if baseline.get("targets") != targets:
+                raise QualityLoopError(
+                    "standalone-target-mismatch",
+                    "baseline-inputのtargetsと--target/--artifactが一致しません。",
+                    exit_code=3,
+                    remediation="対象指定を統一して再実行してください。",
+                )
+            if baseline.get("target_revision") != f"standalone-sha256:{fingerprint}":
+                raise QualityLoopError(
+                    "standalone-target-revision-mismatch",
+                    "baseline-inputのtarget_revisionは対象fingerprintと一致しません。",
+                    exit_code=3,
+                    remediation="target_revisionを省略してCLIに生成させてください。",
+                )
+            exclusions = list(baseline.get("exclusions") or [])
+            if default_exclusion not in exclusions:
+                exclusions.append(default_exclusion)
+            baseline["exclusions"] = exclusions
+
+        QualityLoop._validate_baseline(baseline)
+        return {
+            "case_id": case_id,
+            "owner": owner,
+            "targets": targets,
+            "fingerprint": fingerprint,
+            "baseline": baseline,
+            "baseline_source": "provided" if baseline_input is not None else "generated-minimum",
+            "change_observation": {
+                "method": "finite-manifest",
+                "scope": targets,
+                "baseline_evidence_id": None,
+                "exclusions": [],
+                "limitations": [
+                    "bootstrap時の存在・読取り確認は品質適合Evidenceではない",
+                    "Reviewerは通常のreview操作でEvidenceを独立確認する",
+                ],
+            },
+        }
+
+    @staticmethod
+    def _standalone_case_matches(case: dict, normalized: dict) -> bool:
+        metadata = case.get("case_metadata", {})
+        return (
+            metadata.get("owner") == normalized["owner"]
+            and case.get("baseline") == normalized["baseline"]
+            and case.get("implementation_authorization")
+            == {"allowed": False, "finding_ids": [], "allowed_targets": []}
+            and case.get("change_observation") == normalized["change_observation"]
+        )
 
     @staticmethod
     def _validate_create(payload: dict) -> None:
