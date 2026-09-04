@@ -1,0 +1,33 @@
+{
+  "interface_version": "2.0",
+  "sources": [
+    {
+      "path": "/Users/myamaguchi/Programing/QA-products/quality-loop/quality_loop/cli.py",
+      "exists": true,
+      "kind": "file",
+      "size_bytes": 5967,
+      "sha256": "ab282be13b8b59248c57e868fa30983f338186e7f3c1c9bc304032aa5366838c"
+    },
+    {
+      "path": "/Users/myamaguchi/Programing/QA-products/quality-loop/quality_loop/engine.py",
+      "exists": true,
+      "kind": "file",
+      "size_bytes": 72142,
+      "sha256": "13230e63a34cde93f9276a3598a9977d811e1ab5db59b3fe2ba2c4088a042889"
+    },
+    {
+      "path": "/Users/myamaguchi/Programing/Productivity-Skill/.agents/skills/quality-review/runtime/quality_loop/cli.py",
+      "exists": true,
+      "kind": "file",
+      "size_bytes": 7513,
+      "sha256": "122f41c9c06280c0da4674dfbe39519cf99e626ffb06c9419f9d0589fb3aef53"
+    },
+    {
+      "path": "/Users/myamaguchi/Programing/Productivity-Skill/.agents/skills/quality-review/runtime/quality_loop/engine.py",
+      "exists": true,
+      "kind": "file",
+      "size_bytes": 81712,
+      "sha256": "a7d369c435140010f4c404988ec5c7fcaeef1f74d586ee9919430bc637dc902e"
+    }
+  ]
+}
