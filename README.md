@@ -11,7 +11,7 @@ AI コーディングエージェント（Antigravity, Cursor, Claude Code, Code
 | 編集したい領域 | 正本リポジトリ | 編集先・責任範囲 |
 | :--- | :--- | :--- |
 | **汎用コード理解・開発生産性** | このリポジトリ | [`.agents/skills/`](./.agents/skills/) 配下。`code-understanding-pro` は親Skillとして、一般コードを `generic`、SQLを `sql`、R/Python統計コードを `stats` に分岐する。 |
-| **Quality Loop QA管理** | [`QA-products`](/Users/myamaguchi/Programing/QA-products) | 開発・仕様・テストの正本はQA-products。Productivity-Skillの`quality-review` / `quality-response`は検証済み配布成果物として限定同期する。 |
+| **Quality Loop QA管理** | `QA-products`（ローカル正本リポジトリ） | 開発・仕様・テストの正本はQA-products。Productivity-Skillの`quality-review` / `quality-response`は検証済み配布成果物として限定同期する。 |
 | **DB固有SkillとRWDワークフロー** | [rwd-mysql-skill-toolkit](https://github.com/syrius2000/rwd-mysql-skill-toolkit) | DB固有Skillの正本であり、`Productivity-Skill` と `agentic-evidence-analysis` を利用する「RWDデータワークフローの実行・統合ハブ」。 |
 | **VCD・統計的エビデンス分析** | [agentic-evidence-analysis](https://github.com/syrius2000/agentic-evidence-analysis) | VCD・統計的エビデンス分析Skillの正本。 |
 
@@ -82,7 +82,25 @@ npx skills add syrius2000/Productivity-Skill -g
 
 ---
 
-### 3. 🛡️ 厳格QMS型QA＆品質ループ (Quality Loop Suite)
+### 3. 🔬 方針・実装着手前の軽量レビュー (Pre-Implementation Review)
+
+#### 🧭 **`decision-plan-review`**
+- **概要**: 方針や技術選択を覆し得る重大な前提・未知の制約を早期に確認し、手戻りのない意思決定を支援するレビュー専用スキル。
+- **特徴**: 正式な仕様書（Spec）がなくても、計画やアイデアの段階で「前提の破綻」「隠れたトレードオフ」を抽出します。
+- **利用場面 / 起動例**:
+  - 「この方針の想定が甘くないか、後戻りする条件だけ確認して」
+  - 「技術選択の前提に重大なリスクがないかレビューして」
+
+#### 🚦 **`implementation-readiness-review`**
+- **概要**: 具体的な変更計画・設計に対し、着手前に確認すべきことと実装中に決められることを整理し、実装準備状況（Ready）を判定するスキル。
+- **特徴**: 1画面程度の読み取り専用レビュー。一般的な計画作成では誤発火せず、実装着手前の手戻り要因をピンポイントで洗い出します。
+- **利用場面 / 起動例**:
+  - 「この計画で実装開始してよいか、手戻り要因を見て」
+  - 「受入基準とテスト方針が明確になっているか確認して」
+
+---
+
+### 4. 🛡️ 厳格QMS型QA＆品質ループ (Quality Loop Suite)
 
 #### 🔍 **`quality-review`** (v1.5.0)
 - **概要**: Quality Loop案件において独立レビュアー（Reviewer）として動作し、専用CLI経由で安全に品質検証を行うスキル。
@@ -99,7 +117,7 @@ npx skills add syrius2000/Productivity-Skill -g
 
 ---
 
-### 4. 🌶️ 思考整理・設計のストレステスト (Grilling)
+### 5. 🌶️ 思考整理・設計のストレステスト (Grilling)
 
 #### 🔥 **`grilling`**
 - **概要**: プラン、意思決定、設計アイデアに対し、AIが「デザインツリー（決定境界のフロンティア）」をラウンド形式で徹底的に面接・質問する思考検証スキル。
@@ -109,7 +127,7 @@ npx skills add syrius2000/Productivity-Skill -g
 
 ---
 
-### 5. 🏗️ ドメインモデリング・ユビキタス言語管理
+### 6. 🏗️ ドメインモデリング・ユビキタス言語管理
 
 #### 📘 **`domain-modeling`**
 - **概要**: チームやプロジェクト固有の用語集（`CONTEXT.md`）およびドメイン構造モデルをアクティブに構築・保守するスキル。
@@ -119,9 +137,9 @@ npx skills add syrius2000/Productivity-Skill -g
 
 ---
 
-### 6. 📚 学習・教育支援
+### 7. 👨‍🏫 学習・教育支援
 
-#### 👨‍🏫 **`teach`**
+#### 📚 **`teach`**
 - **概要**: 一方的な解説ではなく、対話形式で段階的に技術やコードの仕組みを教え、`./docs/learning/` 配下にポータル（`INDEX.html`）や教材・学習記録を体系的に構築する教育スキル。
 - **利用場面 / 起動例**:
   - `/teach`（明示起動）: 「〜について体系的に学びたい」「ステップバイステップで教えて」
@@ -129,9 +147,9 @@ npx skills add syrius2000/Productivity-Skill -g
 
 ---
 
-### 7. 🛠️ スキル開発・設計メタガイド
+### 8. 🖋️ スキル開発・設計メタガイド
 
-#### 🖋️ **`writing-great-skills`**
+#### 🛠️ **`writing-great-skills`**
 - **概要**: エージェント用の新しいスキルを作成・修正する際、予測可能性（Predictability）、牽引語（Leading Words）、情報階層・段階的開示（Progressive Disclosure）、No-op枝刈り等を用いて高品質に仕上げるためのメタスキル。
 - **利用場面 / 起動例**:
   - `/writing-great-skills`（明示起動）: 新しいスキルの設計・作成、既存スキルのリファクタリング
@@ -139,29 +157,13 @@ npx skills add syrius2000/Productivity-Skill -g
 
 ---
 
-### 8. 🗄️ ドキュメント管理・自動アーカイブ
+### 9. 🗃️ ドキュメント管理・自動アーカイブ
 
-#### 🗃️ **`artifacts-archiver`**
+#### 📦 **`artifacts-archiver`**
 - **概要**: `./docs/Artifacts/` 内の完了済み計画書や報告書を精査し、対象期間を明記したまとめ文書へ集約して `./docs/Archives/` へ退避するスキル。
 - **特徴**: アクティブな計画書のファイル名・連番を保持し、同じ案件の計画・実装・検証記録を一つのサマリーへまとめます。
 - **利用場面 / 起動例**:
   - 「Artifactsを整理して」「過去の計画書をアーカイブして」「古い書類をまとめて」
-
----
-
-### 9. 🔬 方針・実装着手前の軽量レビュー
-
-#### ✅ **`decision-plan-review`**
-
-- **概要**: 方針や技術選択を覆し得る前提・未知を確認し、人間の意思決定を支援します。正式Specは不要です。
-- **起動例**: 「この方針の想定が甘くないか、後戻りする条件だけ確認して」
-
-#### ✅ **`implementation-readiness-review`**
-
-- **概要**: 具体的な変更計画について、着手前に確認すべきことと実装中に決められることを短く整理します。
-- **起動例**: 「この計画で実装開始してよいか、手戻り要因を見て」
-
-通常は1画面程度の読取り専用レビューです。一般的な計画作成・実装依頼では起動せず、`READY`も実装承認の代行にはなりません。実装後の正式QAは `quality-review`、回答・修正提出は `quality-response` が担当します。
 
 ---
 
