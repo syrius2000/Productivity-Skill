@@ -1,0 +1,79 @@
+# 期待出力スケルトン
+
+## 出力方式
+
+Quick Mode以外の深い解析では、次のMarkdownファイルを保存し、チャットには要約と保存先を返す。
+
+```text
+skill_out/code_understanding/<target>/run_<id>/
+├── report.md
+├── run_meta.json
+└── source_manifest.json
+```
+
+## Full Mode
+
+```markdown
+# コード理解レポート
+
+## 要点
+- ...
+- ...
+- ...
+
+## Step 0: 文脈把握
+...
+
+## Step 1: 概要理解
+...
+
+## Step 2: 詳細追跡
+...
+
+## Step 3: 深い設計理解
+...
+
+## Step 4: 活用
+...
+
+## 提案
+...
+
+## 批判的立場
+...
+```
+
+## Review Mode
+
+```markdown
+# コードレビュー結果
+
+## 要点
+- ...
+- ...
+- ...
+
+## 挙動の要約
+...
+
+## テスト評価
+...
+
+## 指摘
+### Critical
+...
+### Major
+...
+### Consider
+...
+### Nit
+...
+### FYI
+...
+
+## マージ判断
+...
+
+## 残存リスク
+...
+```

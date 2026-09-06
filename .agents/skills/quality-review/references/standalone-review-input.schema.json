@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/quality-loop/standalone-review-input.schema.json",
+  "title": "Quality Loop standalone review bootstrap input",
+  "description": "review-standaloneが受け付けるbootstrap入力の契約",
+  "type": "object",
+  "required": ["owner", "targets"],
+  "properties": {
+    "owner": {
+      "type": "string",
+      "minLength": 1,
+      "description": "案件に登録するOwner識別子"
+    },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1},
+      "description": "明示する通常ファイルのパス集合"
+    },
+    "case_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+      "description": "任意の安全なcase ID"
+    },
+    "criticality": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "regulated"],
+      "description": "最小baselineのリスク重大度"
+    },
+    "baseline": {
+      "type": "object",
+      "description": "任意のQuality Intent上書き。targetsとtarget_revisionはCLI生成値と一致させる",
+      "additionalProperties": false,
+      "properties": {
+        "purpose": {"type": "string"},
+        "intended_use": {"type": "object"},
+        "risk_context": {"type": "object"},
+        "requirements": {"type": "array"},
+        "acceptance_criteria": {"type": "array"},
+        "constraints": {"type": "array"},
+        "applicable_obligations": {"type": "array"},
+        "unacceptable_failures": {"type": "array"},
+        "exclusions": {"type": "array"},
+        "targets": {"type": "array"},
+        "target_revision": {"type": "string"}
+      }
+    }
+  },
+  "additionalProperties": false
+}

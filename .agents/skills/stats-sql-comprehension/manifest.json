@@ -1,0 +1,16 @@
+{
+  "name": "stats-sql-comprehension",
+  "version": "2.1.0",
+  "language": "ja",
+  "description": "code-understanding-pro向けのSQL・統計コード専門アダプター。",
+  "entrypoint": "SKILL.md",
+  "files": [
+    "SKILL.md",
+    "manifest.json",
+    "assets/output-template-sql.md",
+    "assets/output-template-stats.md",
+    "assets/mermaid-dataflow-patterns.md",
+    "references/sql-performance-cheatsheet.md",
+    "references/stats-validation-checklist.md"
+  ]
+}
