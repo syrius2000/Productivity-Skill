@@ -19,3 +19,6 @@ __pycache__/
 
 # Local agent execution state
 .superpowers/
+
+# Quality Management System review cases
+qms-cases/
