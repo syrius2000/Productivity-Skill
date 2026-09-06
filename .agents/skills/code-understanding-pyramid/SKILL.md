@@ -2,6 +2,7 @@
 name: code-understanding-pyramid
 description: Use when code-understanding-pro needs the five-level framework for understanding, explaining, or reviewing existing code. Return findings to that parent Skill; do not operate as a standalone report writer.
 version: "3.0.0"
+license: "MIT"
 ---
 
 # Code Understanding Pyramid Skill

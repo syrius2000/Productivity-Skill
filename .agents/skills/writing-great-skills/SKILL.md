@@ -2,6 +2,7 @@
 name: writing-great-skills
 description: Use when writing, reviewing, or editing an Agent Skill and its instructions, metadata, examples, or supporting references.
 disable-model-invocation: true
+license: "MIT"
 ---
 
 A skill exists to wrangle determinism out of a stochastic system. **Predictability** — the agent taking the same _process_ every run, not producing the same output — is the root virtue; every lever below serves it.

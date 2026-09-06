@@ -1,6 +1,7 @@
 ---
 name: decision-plan-review
 description: Review a proposed direction, framework choice, or critical assumptions when the user asks whether the approach is sound or likely to cause rework. Works before a formal spec exists. Ordinary planning, coding, debugging, PR review, and file existence alone do not trigger this skill. For a concrete plan's readiness to start implementation, use implementation-readiness-review.
+license: "MIT"
 ---
 
 # 方針レビュー

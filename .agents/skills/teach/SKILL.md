@@ -3,6 +3,7 @@ name: teach
 description: Use when the user wants to learn a skill or concept through a stateful, workspace-based teaching session. Always store teaching materials under ./docs/learning/, including when the user asks to create a lesson, reference, learning record, mission, resource list, or learning portal.
 disable-model-invocation: true
 argument-hint: "What would you like to learn about?"
+license: "MIT"
 ---
 
 The user has asked you to teach them something. Treat this as a stateful request: the goal is durable understanding across multiple sessions, not a one-off explanation.

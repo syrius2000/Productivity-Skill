@@ -1,6 +1,7 @@
 ---
 name: implementation-readiness-review
 description: Assess whether a concrete planned change is ready to implement when the user asks for a pre-implementation readiness or rework check. A formal spec is optional. Ordinary planning, direct implementation requests, file existence, lint/test requests, and post-implementation QA do not trigger this skill.
+license: "MIT"
 ---
 
 # 実装着手前レビュー

@@ -2,6 +2,7 @@
 name: quality-review
 description: 明示されたQuality Loop案件でReviewer工程（review、review-plan、verify、assess-risk）を行う場合、またはcase情報がない状態で明示された対象から単発QAのreview-standalone bootstrapを開始する場合に使用する。一般的なコードレビュー、一般的なQA、OpenSpec案件一般、回答代筆、実装、Owner裁定、自己クローズには使用しない。申告外変更はundeclared-change-detectedとして拒否する。
 version: "1.5.0"
+license: "MIT"
 ---
 
 # Quality Review

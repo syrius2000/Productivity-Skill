@@ -1,6 +1,7 @@
 ---
 name: artifacts-archiver
 description: Use when the user explicitly asks to archive documents, clean up old plans, consolidate artifacts, archive all, or organize files in ./docs/Artifacts/ and ./docs/Archives/.
+license: "MIT"
 ---
 
 # Artifacts Archiver (ドキュメント自動アーカイブ・整理スキル)

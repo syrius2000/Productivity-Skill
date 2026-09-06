@@ -6,12 +6,12 @@ AI コーディングエージェント（Antigravity, Cursor, Claude Code, Code
 
 ## 🧭 汎用Skillの正本と編集先
 
-`Productivity-Skill` は、汎用的なコード理解・開発生産性・QA品質管理Skillの正本です。一般コード、SQL、統計コードの理解・レビューや品質管理ワークフローを改善する場合は、このリポジトリ内のSkillを編集します。
+`Productivity-Skill` は、汎用的なコード理解・開発生産性Skillと、配布対象として同期されたQuality Loop Skillを管理するリポジトリです。一般コード、SQL、統計コードの理解・レビューや、このリポジトリで管理するSkillの改善を行う場合は、対象の正本境界を確認してから編集します。
 
 | 編集したい領域 | 正本リポジトリ | 編集先・責任範囲 |
 | :--- | :--- | :--- |
 | **汎用コード理解・開発生産性** | このリポジトリ | [`.agents/skills/`](./.agents/skills/) 配下。`code-understanding-pro` は親Skillとして、一般コードを `generic`、SQLを `sql`、R/Python統計コードを `stats` に分岐する。 |
-| **Quality Loop QA管理** | `QA-products`（ローカル正本リポジトリ） | 開発・仕様・テストの正本はQA-products。Productivity-Skillの`quality-review` / `quality-response`は検証済み配布成果物として限定同期する。 |
+| **Quality Loop QA管理** | `QA-products`（ローカル正本リポジトリ） | 案件・仕様・テスト・実装回答の正本はQA-products。Productivity-Skillの`quality-review` / `quality-response`は検証済みの配布用Skillとして限定同期する。 |
 | **DB固有SkillとRWDワークフロー** | [rwd-mysql-skill-toolkit](https://github.com/syrius2000/rwd-mysql-skill-toolkit) | DB固有Skillの正本であり、`Productivity-Skill` と `agentic-evidence-analysis` を利用する「RWDデータワークフローの実行・統合ハブ」。 |
 | **VCD・統計的エビデンス分析** | [agentic-evidence-analysis](https://github.com/syrius2000/agentic-evidence-analysis) | VCD・統計的エビデンス分析Skillの正本。 |
 
@@ -31,8 +31,7 @@ AI コーディングエージェント（Antigravity, Cursor, Claude Code, Code
 
 ## 🚀 はじめに (Getting Started)
 
-本リポジトリ内のスキルはすべて `npx skills` (Agent Skills Standard) に準拠しています。
-本リポジトリを導入することで、各種エージェントで一元化された高品質なスキルを活用できます。
+本リポジトリは、Agent Skills形式のSkillを`.agents/skills/`で管理します。公開配布元から導入する場合は、利用するエージェントと配布経路が対応していることを確認してください。
 
 ### インストール方法
 
@@ -47,7 +46,8 @@ npx skills add syrius2000/Productivity-Skill -g
 ### 起動方法のルール
 
 - **自然言語自動起動 (Model-invoked)**: 自然言語で依頼すると、エージェントが状況を判別して自動起動します。
-- **手動コマンド起動 (User-invoked)**: `disable-model-invocation: true` のスキル（`/teach`, `/writing-great-skills` 等）は、常時コンテキストを消費しないよう設計されており、スラッシュコマンド等で明示的に起動します。
+- **手動コマンド起動 (User-invoked)**: `disable-model-invocation: true` の`teach`と`writing-great-skills`は、自然言語による自動起動ではなく、スラッシュコマンド等で明示的に起動します。
+- **導入経路の確認**: `npx skills`を利用する場合のコマンドや配置先は、利用するエージェントとCLIの現行仕様を確認してください。このREADMEはローカルリポジトリの構成を説明するもので、外部公開・配布の成功を保証するものではありません。
 
 ---
 
@@ -104,10 +104,12 @@ npx skills add syrius2000/Productivity-Skill -g
 
 #### 🔍 **`quality-review`** (v1.5.0)
 - **概要**: Quality Loop案件において独立レビュアー（Reviewer）として動作し、専用CLI経由で安全に品質検証を行うスキル。
+- **適用条件**: 正式なQuality Loop案件でReviewer工程を行う場合、または対象ファイルが明示された単発QAを`review-standalone`で開始する場合に使用します。一般的なコードレビューの入口ではありません。
 - **特徴**: 案件正本（`case.json`）の直接改ざんを禁止し、CLIによる状態遷移制御（単発開始 `review-standalone`、初回レビュー `review`、計画評価 `review-plan`、独立検証 `verify`、残余リスク評価 `assess-risk`）、申告外変更の機械的遮断（`undeclared-change-detected`）、比例性ゲートを厳格に適用します。
+- **境界**: `review-standalone`は案件を開始してレビュー担当者へ引き渡すbootstrapであり、Finding、品質適合、受入、実装許可、Owner裁定を単独では生成しません。
 - **利用場面 / 起動例**:
   - Quality Loop案件でステータスが `next_role=reviewer` の際に自動起動。
-  - case情報がない単発QAでは、対象Artifactを `--target` または `--artifact` で指定して `review-standalone` から開始。
+  - case情報がない単発QAでは、対象ファイルを `--target` または `--artifact` で指定して `review-standalone` から開始。
 
 #### ✍️ **`quality-response`** (v1.4.0)
 - **概要**: Quality Loop案件において実装者（Implementer）として動作し、専用CLI経由で計画や修正・反証エビデンスを提出するスキル。
@@ -188,12 +190,18 @@ npx skills add syrius2000/Productivity-Skill -g
 ├── docs/
 │   ├── Archives/                # 過去サマリー文書・ZIPアーカイブ
 │   └── Artifacts/               # アクティブ作業用計画・報告書
-├── tests/                       # リポジトリ保守・契約検証テスト
+├── tests/                       # リポジトリ保守・Skill契約検証テスト
 └── README.md
 ```
+
+実装計画や作業報告は`docs/Artifacts/`、完了済みの履歴は`docs/Archives/`で確認します。Skillの実際の起動条件・出力契約・安全境界は、各Skillの`SKILL.md`を正本とします。
 
 ---
 
 ## 📜 ライセンス
 
-本リポジトリ全体のライセンスは定義していません。各スキルに同梱された `SKILL.md`、`LICENSE`、`LICENSE.txt` 等の記載を確認してください。
+本リポジトリは、原則として [MIT License](./LICENSE) のもとで公開されています。
+
+各スキル個別の利用条件については、各スキルの `SKILL.md`（front matter の `license` 項目）または同梱のライセンス文書をご確認ください。
+- **汎用・教育・作業支援スキル（11件）**: `MIT`
+- **`code-understanding-pro`**: `Internal use`（個人利用・社内検討向け。詳細は同梱の [`LICENSE.txt`](./.agents/skills/code-understanding-pro/LICENSE.txt) を参照）
