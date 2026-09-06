@@ -1,6 +1,6 @@
 {
   "name": "stats-sql-comprehension",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "language": "ja",
   "description": "code-understanding-pro向けのSQL・統計コード専門アダプター。",
   "entrypoint": "SKILL.md",

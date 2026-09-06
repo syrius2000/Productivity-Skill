@@ -1,7 +1,7 @@
 ---
 name: stats-sql-comprehension
 description: Use when code-understanding-pro needs specialist analysis of complex analytical SQL, dbt models, BigQuery queries, CTEs, window functions, or R/Python statistical code. Return findings to that parent Skill; do not operate as a standalone report writer.
-version: "2.0.0"
+version: "2.1.0"
 license: "MIT"
 ---
 
@@ -17,10 +17,10 @@ license: "MIT"
 
 本Skillは `code-understanding-pro` の専門アダプターである。
 
-| 対象 | アダプター | テンプレート |
-|---|---|---|
-| SQL、dbt、BigQuery、CTE | `sql` | `assets/output-template-sql.md` |
-| R/Python統計解析コード | `stats` | `assets/output-template-stats.md` |
+| 対象                    | アダプター | テンプレート                      |
+| ----------------------- | ---------- | --------------------------------- |
+| SQL、dbt、BigQuery、CTE | `sql`      | `assets/output-template-sql.md`   |
+| R/Python統計解析コード  | `stats`    | `assets/output-template-stats.md` |
 
 - 共通理解の順序は `code-understanding-pyramid` を使う。
 - 成果物は親Skillの `report.md`、`run_meta.json`、`source_manifest.json` に統合する。親Skillが利用できない場合は、保存や検証を開始せず、その制約を明示して専門観点だけを返す。
@@ -29,110 +29,38 @@ license: "MIT"
 
 ## SQL安全契約
 
-- SQLは原則として読解対象であり、ユーザーの明示承認なしに実行しない。
+- SQLは原則として読解対象であり、無承認では実行しない。ユーザーの明示承認なしに実行しない。
 - 実行が承認された場合も、まず読み取り専用の件数・重複・NULL・JOIN前後検証を行う。
 - DB名、SQL方言、1行の粒度、JOINキーが不明な場合は推測と事実を分ける。
 - PHI/PIIや認証情報をレポートへ複製しない。
 
 ---
 
-## 起動条件
+## 追加する専門確認
 
-以下のような依頼を受けた際に自動的に発動・適用されます。
+親Skillの理解順序を繰り返さず、親から渡された対象・事実・未確認点・依頼観点に対して、該当する行だけを確認する。情報がない項目は推測せず「未確認」と返す。結論に必要な情報がコードにない場合は、非該当とはせず未確認とする。
 
-- 「このSQLを説明して」「クエリのロジックを解析して」
-- 「dbtモデルを解読して」「複雑なCTEの流れを整理して」
-- 「SQLのデータフロー（リネージ）を可視化して」
-- 「SQLのパフォーマンスやコスト、ボトルネックを評価して」
-- 「R/Pythonの統計解析コード・集計ロジックをレビューして」
-- 「統計的処理（前処理、欠損値補完、バイアス）の妥当性を確認して」
+## SQL追加確認
 
----
+| 対象となる入力 | 確認すること |
+|---|---|
+| テーブル、CTE、集計、または1行の意味 | 粒度と主キー候補を確認し、不明なら未確認とする |
+| JOINまたは複数テーブル | キーの一意性、結合前後の粒度、行数増加が集計へ与える影響を確認する |
+| WHERE、CASE、NULL処理 | 絞り込み、Outer JOIN後のNULL、三値論理による除外を確認する |
+| GROUP BY、集計関数、window関数 | 集計単位、重複合算、window枠を確認する。`DISTINCT`や近似集計は意味・精度・方言を確認してから提案する |
 
-## コア原則
+## 統計追加確認
 
-1. **データ構造と流れを最優先する**
-   単なる文字解読ではなく、テーブル・CTE間でデータがどのように変換・膨張・縮小されるかを視覚的かつ論理的に追跡します。
-2. **パフォーマンス・エッジケースを明示する**
-   フルスキャン、シャッフル、重複発生（JOINの多対多）、NULLハンドリング、ウィンドウ関数の範囲決定などの潜在的リスクを見落としません。
-3. **統計的妥当性とバイアスの分離**
-   統計解析コードにおいて、コード上の事実・統計的推論・前提条件・バイアス（選択バイアス、生存者バイアス等）を明確に分けて報告します。
+| 対象となる入力 | 確認すること |
+|---|---|
+| 比較、推定、予測、対象集団 | 推定対象と母集団を区別する |
+| 除外、追跡、欠測、サブセット | 選択・欠測の条件と一般化可能性への影響を確認する |
+| 群比較、因果、観察データ | 交絡と選択バイアスを分ける。処置群の平均だけから因果効果を主張しない |
+| モデル、検定、推定量 | 前提、適合確認、未確認の前提を示す |
+| 乱数、依存パッケージ、実行環境 | 再現に必要な情報と不足を示す |
 
----
-
-# 5段階 統計＆SQL理解ピラミッド
-
-```mermaid
-flowchart TD
-    A[Step 0: コンテキスト把握\n対象DB・入力/出力テーブル・指標]
-    B[Step 1: データフロー概要\nMermaidリネージ図・全体処理要約]
-    C[Step 2: ロジック詳細追跡\nCTE・JOIN・ウィンドウ関数・統計処理]
-    D[Step 3: 妥当性＆パフォーマンス評価\nフルスキャン・重複・統計バイアス・例外]
-    E[Step 4: 実務成果物生成\n解読仕様書・高速化SQL・検証クエリ]
-    A --> B --> C --> D --> E
-```
-
----
-
-## Step 0: データコンテキスト把握
-
-目的：分析対象の環境とデータの入り口・出口を定義します。
-
-確認事項：
-- 対象データベース／言語（BigQuery, dbt, PostgreSQL, MySQL, R, Python）
-- 入力テーブル／ソースモデル
-- 出力テーブル／集計指標／ターゲットエンティティ
-- 目的（分析レポート、マテリアライズドモデル、ダッシュボード用データマート等）
-
----
-
-## Step 1: データフロー＆構造概要
-
-目的：細部に入る前に、中間処理（CTE）やデータ移行の流れを可視化します。
-
-出力内容：
-- 全体処理の一文要約
-- 主要CTE／中間ステップの役割一覧
-- データフローリネージ図（Mermaid `flowchart TD`）
-
----
-
-## Step 2: SQLロジック＆統計処理の詳細追跡
-
-目的：ステップごとの具体的な変換・集約・計算処理を確定します。
-
-追跡項目：
-- **JOINロジック**: 結合条件、Outer/Innerの意図、行数変化の予測
-- **集約・ウィンドウ関数**: `GROUP BY` 単位、`PARTITION BY`, `ORDER BY`, `ROWS BETWEEN` の適用範囲
-- **データ変換**: `CASE WHEN`, NULLハンドリング (`COALESCE`, `IFNULL`), 日付・タイムゾーン処理
-- **統計処理**: 前処理（外れ値除去、欠損値補完）、パラメータ推定、検定・統計量の算出式
-
----
-
-## Step 3: 統計的妥当性＆パフォーマンス評価
-
-目的：潜在的な非効率・バグ・統計的欠陥を評価します。
-
-評価観点：
-- **SQLパフォーマンス**: フルスキャンリスク、不要な `SELECT *`、シャッフル発生要因、パーティション/クラスタリングの効き
-- **データ品質リスク**: JOINによる行数膨張（多対多）、NULL挿入による計算バグ、重複データの発生
-- **統計的品質リスク**: 選択バイアス、生存者バイアス、多重性の問題、サンプルサイズと検出力、前提条件の欠如
-
----
-
-## Step 4: 実務アウトプット生成
-
-目的：ユーザーの目的に合わせた専門分析を、親Skillの共通 `report.md` へ返します。
-
-専門節の形式（`assets/` 参照）：
-- `assets/output-template-sql.md`: SQL解読・解説レポート
-- `assets/output-template-stats.md`: 統計解析評価レポート
-- `assets/mermaid-dataflow-patterns.md`: データフロー図パターン
-
----
+親Skillへ返す専門節の形式は `assets/output-template-sql.md` または `assets/output-template-stats.md` を参照する。データフロー図は、親Skillが `complex` と判定した場合だけ作る。
 
 ## 参照ファイル
 
-詳細なチェックリストやパターンは以下を参照してください：
-- `references/sql-performance-cheatsheet.md`: SQLパフォーマンス＆アンチパターン解説
-- `references/stats-validation-checklist.md`: 統計解析・パイプライン妥当性チェックリスト
+SQL性能・方言の詳細が判断に必要な場合だけ `references/sql-performance-cheatsheet.md` を読む。統計手法・バイアスの詳細評価が必要な場合だけ `references/stats-validation-checklist.md` を読む。

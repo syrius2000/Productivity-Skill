@@ -1,642 +1,120 @@
 ---
 name: code-understanding-pro
 description: Use when a user asks to understand, review, document, explain, or safely refactor existing code in Japanese.
-version: "2.1.0-ja"
+version: "2.3.0-ja"
 license: "Internal use"
 ---
 
 # code-understanding-pro
 
-## 目的
+## 目的 & コア原則
 
-このSkillは、既存コードを単に「説明」するのではなく、ユーザーがコードベースを段階的に理解し、レビュー・QA・ドキュメント化・安全なリファクタリングへ接続できるように支援する。
+このSkillは、既存コードを段階的に理解し、レビュー・QA・ドキュメント化・安全なリファクタリングを支援する。
 
-中心思想は以下である。
+1. **事実と推論の厳格な分離**: コード上の直接事実、推論、未確認事項、リスクを峻別する。設計意図を根拠なく断定しない。
+2. **プロジェクト文脈優先**: 一般論より、テスト、型、呼び出し元、設計メモ、Git履歴を証拠として最優先する。
+3. **非破壊性と実行境界**: ユーザーの明示的承認なしにファイル変更・コード実行を行わない。テスト実行も副作用を確認後に行う。
 
-1. **理解してから評価する**
-2. **文脈、テスト、呼び出し元、ドキュメントを根拠として扱う**
-3. **コード上の事実、推論、不確実性を分離する**
-4. **副作用、外部依存、エッジケース、テスト不足を見落とさない**
-5. **軽い質問には軽く、深いレビューには深く対応する**
+## モード判定と成果物契約
 
----
+開始時に対象、目的、許可された操作、対象外を短く固定する。対象の曖昧さが正確性を損なう場合だけ質問し、それ以外は仮定を明記して進める。呼び出し元、型、テスト、設定、Git履歴は、説明に必要な範囲だけ調査する。
 
-## 起動条件
+依頼内容に基づき、上から最初に合致するモードを採用する。
+| 優先 | モード | 判定条件 | 主な成果物・出力仕様 | 必読参照資料 |
+|---:|---|---|---|---|
+| 1 | Refactoring | 改善・構造修正・変更比較 | `assets/output-template-refactoring.md` | [安全確認](references/refactoring-safety-checklist.md) |
+| 2 | Review | レビュー・QA・バグ・マージ判断 | `assets/output-template-review.md` | [重大度基準](references/review-severity-guide.md) |
+| 3 | Documentation | README・仕様書・DocString | `report.md`（概要/API/フロー/入出力例/制約/本文） | [Python](assets/docstring-template-python.md) / [R](assets/docstring-template-r.md) |
+| 4 | Full | 複数ファイル・深層読解・オンボーディング | `assets/output-template-full.md` | [ピラミッド](references/qiita-code-reading-pyramid.md) |
+| 5 | Quick | 単一関数・短い質問（上記以外） | チャット回答のみ（成果物保存なし） | [Quickテンプレート](assets/output-template-quick.md) |
 
-このSkillは、ユーザーが以下のような依頼をしたときに使用する。
+> **Documentation モードの保存要件**: `report.md` を保存する場合は、必須8節を満たした上で `## 詳細` 配下に生成ドキュメント本文および入出力例・制約を配置する。初学者向け解説を求められた場合は [assets/output-template-beginner.md](assets/output-template-beginner.md) を参照。
 
-- 「このコードを説明して」
-- 「この関数は何をしている？」
-- 「ロジックを解析して」
-- 「レビューして」
-- 「QAして」
-- 「バグがないか見て」
-- 「リファクタリング案を出して」
-- 「DocStringを書いて」
-- 「Markdownドキュメント化して」
-- 「初学者にもわかるように説明して」
-- 「Cursor / Codex / Claude Code / Gemini CLI で使うSkillにしたい」
+## 読解プロセス（5段階ピラミッド）
 
----
+`Quick` は、対象・入力/出力・未確認点を Step 0 で確認し、質問へ直接必要な Step 2 だけを追跡する。直接事実と、該当する場合の未確認点をチャットで返し、保存・Mermaid・全体設計調査は要求しない。
 
-## コア原則
+`Full`、`Review`、`Documentation`、`Refactoring` は Step 0 から順に実施し、各ステップの完了条件を満たしてから次へ進む。共通の問いを持つ複数対象は、一つのレポートへまとめ、対象別の根拠を記載する。
 
-### 0. 理解優先、評価は後
+- **Step 0: 文脈把握（地図作成）**:
+  - 【調査項目】対象ファイル・行範囲、見かけ上の役割、入力と出力、呼び出し元、関連テスト/Doc/Issue、外部依存、不明点。
+  - 【完了条件】対象コードの境界と前提条件が特定され、未確認事項が洗い出されていること。
+- **Step 1: 概要理解（全体像把握）**:
+  - 【調査項目】一文要約、主要処理3〜5ステップ、主な要素と責務、ラフなデータフロー。
+  - 【完了条件】細部に立ち入る前に全体の入出力の流れを暫定把握できていること（断定は避ける）。
+- **Step 2: 詳細追跡（挙動解明）**:
+  - 【調査項目】インターフェース（引数/戻り値の型・意味）、重要変数・制御フロー（分岐/ループ）、副作用（ファイルI/O・DB・API・状態変更）、例外・境界値。
+  - 【完了条件】代表的な入力値に対するデータ変化と副作用のリスクが具体的に追跡できていること。
+- **Step 3: 深い設計理解（意図とリスク）**:
+  - 【調査項目】設計選択理由の可能性、業務・性能・互換性制約、トレードオフ、潜在リスク（保守性・並行性・セキュリティ）、エッジケース。
+  - 【判断基準】コード上の事実と推論を厳格に分離し、根拠のない設計意図は「推測」と明記すること。
+- **Step 4: 活用（成果物生成）**:
+  - 【完了条件】採用モードに応じた成果物を生成し、親Skillとして保存・事後検証を行う。
 
-レビューコメントに飛びつかず、まず以下を確認する。
+### Mermaid 複雑度判定基準
 
-- コードは何をするか
-- どの入力を受け取るか
-- どの出力を返すか
-- どの状態を変更するか
-- どの外部資源に触るか
-- どのテストやドキュメントと対応するか
+次のいずれかに該当する場合は複雑度を `complex` と判定し、Mermaid図（`flowchart TD` 等）を作成する（作図パターンは [assets/mermaid-patterns.md](assets/mermaid-patterns.md) を参照）。非該当の場合は `simple` とし文章フローで記載する。
 
-その後に、品質、リスク、改善案を評価する。
+- 複数クラスまたはモジュール間で、状態またはデータが受け渡される。
+- 分岐の選択により、外部結果または状態変更が変わる。
+- 非同期処理、時間順序、再試行が理解の中心である。
 
-### 1. 対話優先
+主要ステップ数だけ、または局所的な分岐・ループだけでは `complex` としない。
 
-コード理解は一回で完了するとは限らない。ユーザーの追加質問に備え、説明の背景を保持する。
+## スイート連携（親Skill契約）
 
-ただし、必要以上に質問で止まらない。十分な文脈があれば、仮定を明示してベストエフォートで進める。
+`code-understanding-pro` はコード理解スイートの親Skillであり、成果物の所有・保存・検証・チャット要約を集約する。
 
-### 2. プロジェクト文脈を優先
+- **共通理解フレーム**: 下位Skill `code-understanding-pyramid` を同一セッション内で参照し、理解の順序として利用する。下位Skill単独の成果物ディレクトリや独立回答は作成させない。親は子へ「対象パスと質問」「確認済みの事実」「未確認点」「子にだけ求める観点」を渡す。
+- **SQL / 統計アダプター委譲**:
+  - SQL（dbt/CTE/ウィンドウ関数）: `stats-sql-comprehension` へ委譲（`--adapter sql`）。テンプレートは [../stats-sql-comprehension/assets/output-template-sql.md](../stats-sql-comprehension/assets/output-template-sql.md) を使用する。入力に現れる場合だけ、データ粒度・CTE一覧・JOIN変化・検証SQLを統合し、情報がなければ未確認と明記する。
+  - 統計解析（R/Python）: `stats-sql-comprehension` へ委譲（`--adapter stats`）。テンプレートは [../stats-sql-comprehension/assets/output-template-stats.md](../stats-sql-comprehension/assets/output-template-stats.md) を使用する。入力に現れる場合だけ、対象母集団・欠測除外・推定量前提・バイアス・再現コードを統合し、情報がなければ未確認と明記する。
+- **配置境界**: 下位Skillが同じSkill配置ルートに存在しない場合は、利用不可を明記した上で親Skill単独の一般分析として続行する。
 
-一般論より、プロジェクト固有の証拠を優先する。
+## レビュー重大度語彙（一般コードレビュー）
 
-優先順位：
+Review モードでは指摘を以下に分類し、各指摘に **[分類 / 場所(ファイルと行番号) / 根拠 / 修正案 / 実行すべきテスト]** を必ず明記する。
 
-1. ユーザーが選択したコードまたは対象ファイル
-2. 近傍の定義、import、型、設定
-3. 関連テスト
-4. 呼び出し元、利用箇所
-5. README、設計メモ、Issue、仕様書
-6. Git履歴、変更理由、PR説明
-
-### 3. テストは意図を示すが、絶対ではない
-
-テストは開発者の意図を示す有力な証拠である。しかし、以下の可能性があるため絶対視しない。
-
-- テストが古い
-- 実装詳細に依存している
-- 仕様変更に追随していない
-- 異常系や境界値を欠いている
-- バグを固定化している
-
-テストと実装、ドキュメント、呼び出し元が矛盾する場合は、矛盾として明示する。
-
-### 4. 証拠の分離
-
-必ず以下を分ける。
-
-- **コードから直接確認できる事実**
-- **根拠に基づく推論**
-- **不確実な点**
-- **リスク**
-- **推奨アクション**
-
-### 5. 行数削減を目的化しない
-
-「短いコード」は常に良いとは限らない。
-
-リファクタリング提案では、以下を必ず確認する。
-
-- 挙動変更の有無
-- 可読性の改善有無
-- テスト容易性
-- 例外処理、ログ、バリデーションの維持
-- 回帰リスク
-
----
-
-## 開始ゲートとモード判定
-
-開始時に、対象・目的・許可された操作・対象外を短く固定する。対象が曖昧で正確性を損なう場合だけ質問し、それ以外は仮定を明記して進める。呼び出し元、型、テスト、設定までの調査は、挙動の説明に必要な範囲だけに限定し、拡張理由を記録する。Git履歴は、現在のコードだけでは設計理由を説明できない場合、または依頼された場合に限って参照する。
-
-モードは次の順序で決める。複数に該当する場合は、上から最初に一致するモードを採用する。
-
-| 優先順位 | モード | 判定条件 |
-|---:|---|---|
-| 1 | Refactoring | 変更、修正、リファクタリング、変更前後比較が明示されている |
-| 2 | Review | レビュー、QA、バグ、セキュリティ、マージ判断が目的 |
-| 3 | Documentation | README、DocString、仕様書、設計メモの作成・更新が目的 |
-| 4 | Full | 複数ファイル、アーキテクチャ、オンボーディング、複雑な処理の理解が目的 |
-| 5 | Quick | 単一関数・短い範囲の説明で、上記に該当しない |
-
-## 実行境界
-
-| 操作 | 扱い |
-|---|---|
-| 読み取り、静的解析、既存テストの参照 | 依頼範囲内で実施し、対象と根拠を記録する |
-| 既存テストの実行 | 副作用、外部接続、データ変更の可能性を確認してから実施する |
-| 対象コード・SQLの実行 | 外部接続やデータ変更があり得る場合は、影響と承認要否を明記する |
-| ファイル変更、外部書き込み、破壊的操作 | ユーザーの明示的な承認なしに実施しない |
-
-# 5段階コード理解ピラミッド
-
-```mermaid
-flowchart TD
-    A[Step 0: 文脈把握\n目的・入出力・関連ファイル]
-    B[Step 1: 概要理解\n一言要約・主要処理・全体フロー]
-    C[Step 2: 詳細追跡\n引数・戻り値・変数変化・副作用]
-    D[Step 3: 深い設計理解\n設計意図・制約・代替案・リスク]
-    E[Step 4: 活用\nDocString・文書化・レビュー・リファクタリング]
-    A --> B --> C --> D --> E
-```
-
----
-
-## Step 0: 文脈把握
-
-目的：詳細を読む前に地図を作る。
-
-確認するもの：
-
-- 対象ファイル、関数、クラス、モジュール、行範囲
-- 見かけ上の役割
-- 入力
-- 出力
-- 典型的な利用シナリオ
-- 関連ファイル、関連モジュール、呼び出し元
-- テスト、README、設計メモ、Issue
-- 外部依存
-- 不明点
-
-出力形式：
-
-```markdown
-## Step 0: 文脈
-
-- 対象:
-- 見かけ上の役割:
-- 入力:
-- 出力:
-- 関連ファイル:
-- 関連テスト/ドキュメント:
-- 外部依存:
-- 不明点:
-```
-
----
-
-## Step 1: 概要理解
-
-目的：細部に入る前に、まず「わかったつもり」になれる全体像を作る。
-
-出力するもの：
-
-- 一文要約
-- 主要処理ステップ3〜5個
-- 主なクラス、関数、モジュールと役割
-- 入力 → 処理 → 出力のラフな流れ
-- 推定される型やデータ構造
-- 必要に応じたMermaid図
-
-出力形式：
-
-````markdown
-## Step 1: 概要理解
-
-### 一文要約
-...
-
-### 主要処理
-1. ...
-2. ...
-3. ...
-
-### 主要な登場要素
-| 名前 | 種類 | 役割 |
-|---|---|---|
-
-### ラフなデータフロー
-...
-
-### 図
-```mermaid
-flowchart TD
-    A[入力] --> B[検証]
-    B --> C[変換]
-    C --> D[出力]
-```
-````
-
-注意：この段階の理解は暫定である。断定しすぎない。
-
----
-
-## Step 2: 詳細追跡
-
-目的：コードが実際にどう動くかを追跡する。
-
-確認するもの：
-
-- 関数、クラス、モジュールの責務
-- 引数の型、意味、必須性、例
-- 戻り値の型、意味、例
-- 重要変数とその変化
-- 条件分岐
-- ループ
-- コールバック、非同期処理
-- 例外処理
-- ファイルI/O
-- DBアクセス
-- API/ネットワークアクセス
-- 環境変数
-- グローバル状態
-- クラス状態、メンバ変数の変更
-- ログ出力
-- 時刻、乱数
-- サンプルデータによる処理追跡
-
-出力形式：
-
-```markdown
-## Step 2: 詳細追跡
-
-### インターフェース
-| 項目 | 意味 | 型/構造 | 例 |
-|---|---|---|---|
-
-### 制御フロー
-...
-
-### データフロー追跡
-| ステップ | 変数/状態 | 値の例 | 説明 |
-|---|---|---|---|
-
-### 副作用
-| 副作用 | 場所 | 意味/リスク |
-|---|---|---|
-
-### 例外・境界条件
-...
-```
-
----
-
-## Step 3: 深い設計理解
-
-目的：表面的な動作から、設計意図、制約、代替案、リスクへ進む。
-
-分析するもの：
-
-- この設計が選ばれた理由の可能性
-- 業務上、性能上、互換性上の制約
-- トレードオフ
-- 代替実装
-- 依存ライブラリや外部モジュールの理由
-- 保守性リスク
-- 性能リスク
-- セキュリティリスク
-- 並行処理、状態管理リスク
-- エッジケース
-- Git履歴やIssueから見える変更背景
-
-出力形式：
-
-```markdown
-## Step 3: 深い設計理解
-
-### コードから確認できる事実
-- ...
-
-### 根拠に基づく推論
-- ...
-
-### トレードオフ
-| 選択 | 利点 | コスト | 代替案 |
-|---|---|---|---|
-
-### リスクとエッジケース
-| リスク | 重要度 | 根拠 | 確認方法 |
-|---|---|---|---|
-```
-
-重要：設計意図を勝手に断定しない。README、Issue、コメント、Git履歴、テストなどの根拠がない場合は「推測」と明記する。
-
----
-
-## Step 4: 活用
-
-目的：理解した内容を、実務で使える成果物へ変換する。
-
-ユーザーの依頼に応じて、以下を生成する。
-
-### 4A. ドキュメント化
-
-- DocString
-- inline comment
-- Markdown仕様書
-- 初学者向け説明
-- 設計メモ
-- オンボーディング資料
-
-含めるべき項目：
-
-- 目的
-- 入力
-- 出力
-- 主な処理フロー
-- 重要な制約
-- エッジケース
-- 使用例
-
----
-
-# スイート内の役割分担
-
-`code-understanding-pro` は、コード理解スイートの親Skillである。対象と依頼内容を確認し、必要な下位Skillを選び、成果物を保存し、チャット要約を返す。
-
-| 対象 | 使用するフレーム / アダプター | `--adapter` |
-|---|---|---|
-| 一般的なスクリプト・アプリコード | `code-understanding-pyramid` | `generic` |
-| SQL、dbt、CTE、ウィンドウ関数 | `code-understanding-pyramid` + `stats-sql-comprehension` | `sql` |
-| R/Pythonの統計解析コード | `code-understanding-pyramid` + `stats-sql-comprehension` | `stats` |
-
-- `code-understanding-pyramid` は理解の順序を提供する。成果物の保存先は所有しない。
-- `stats-sql-comprehension` は専門観点を追加する。独自の長文チャット回答や別レポートを作らない。
-- 出力契約の正本は `references/interface.md` とする。
-
-下位Skillは、この親Skillと同じSkill配置ルートに存在する場合だけ利用する。親Skillは対象に応じて下位Skillへ観点を委譲し、保存・検証・最終回答は親Skillの契約に集約する。下位Skillが利用できない場合は、利用不可を明示したうえで親Skill単独の一般分析として続行する。
-
----
-
-# 出力契約
-
-## チャットとMarkdownの使い分け
-
-このSkillは、回答の長さと再利用性に応じて出力先を切り替える。
-
-| モード | 主な用途 | 出力先 |
-|---|---|---|
-| Quick | 単一関数、短いコード、軽い質問 | チャットのみ |
-| Full | 複雑なコード理解、設計把握、オンボーディング | Markdown + チャット要約 |
-| Review | QA、バグ探し、マージ判断 | Markdown + チャット要約 |
-| Documentation | README、仕様書、設計メモ、DocString | Markdown + チャット要約 |
-| Refactoring | リファクタリング提案、変更前後比較 | Markdown + チャット要約 |
-
-Full、Review、Documentation、Refactoringでは、チャットに長文レポートを貼り付けるだけで完了としない。Markdown本文を保存し、チャットには結論、重要な指摘、保存先を簡潔に返す。
-
-## 保存先とファイル名
-
-成果物はリポジトリルートから次の形式で保存する。`<target>` は対象ファイルまたはディレクトリ名、`<id>` は指定されたIDまたはJST時刻である。
-
-```text
-skill_out/code_understanding/<target>/run_<id>/
-├── report.md
-├── run_meta.json
-└── source_manifest.json
-```
-
-`run_meta.json` には契約版、モード、アダプター、読者、対象、Skill版、生成時刻を記録する。`source_manifest.json` には根拠ソースのパス、存在状態、サイズ、SHA-256を記録し、ソース本文は複製しない。
-
-同一のrunディレクトリが既に存在する場合は上書きしない。再実行時は別の `--run-id` を指定する。
-最終run名を排他的に予約してから3ファイルを直接書き込むため、成功前には部分的なrunが見えることがある。生成中は `.incomplete` を置き、成功時だけ削除する。例外、プロセス強制終了、電源断では `.incomplete` または部分ファイルが残り、同じrun IDの再利用は拒否される。内容を確認したうえで利用者が削除するか、別の `--run-id` で再実行する。
-
-出力rootには、他プロセスや他利用者が生成中に変更しない信頼済み非共有ディレクトリを使用する。同一UIDの別プロセスが親ディレクトリを能動的に差し替える状況は、このCLIの保護境界外とする。
-
-## 保存手順
-
-AIが選択したテンプレートでMarkdown本文を作成した後、次のCLIで保存する。
-
-```bash
-python3 .agents/skills/code-understanding-pro/scripts/write_report.py \
-  --mode full \
-  --target src/example.py \
-  --content-file /tmp/report.md \
-  --output-root ./skill_out/code_understanding \
-  --run-id example \
-  --adapter generic \
-  --audience beginner \
-  --source src/example.py
-```
-
-出力先を自動生成するため、`--run-id` を省略してもよい。`--source` は複数回指定できる。CLIは3成果物のパスを標準出力する。
-
-保存後は必ず検証する。
-
-```bash
-python3 .agents/skills/code-understanding-pro/scripts/validate_report.py \
-  ./skill_out/code_understanding/example/run_example/report.md \
-  --adapter generic
-```
-
-## コンテキスト収集
-
-`collect_code_context.py` は従来どおり標準出力へ出力できる。再利用する場合は、run単位のMarkdownとして保存する。
-
-```bash
-python3 .agents/skills/code-understanding-pro/scripts/collect_code_context.py src tests \
-  --output-root ./skill_out/code_understanding \
-  --run-id context
-```
-
-`--output-root` は `code_context.md`、`mode: Context` のmetadata、実際に収集した各ファイルの `source_manifest.json` を保存する。これはFull、Review、Documentation、Refactoringの `report.md` 契約を補助するContext成果物であり、収集済み生テキストを通常レポートへ強制してはならない。`code_context.md` は必須見出しを満たす必要がなく、`validate_report.py` の検証CLIの対象外である。
-
-ディレクトリを指定した場合、manifestにはディレクトリ自体ではなく、実際に `code_context.md` へ出力されたファイルを記録する。出力上限で省略されたファイルは記録しない。
-
-単一ファイルへ保存する場合は `--output <path>` を使う。`--output-root` と `--output` を同時に指定した場合は `--output-root` を優先する。
-
-## 機密情報と失敗時の扱い
-
-- APIキー、パスワード、シークレット、Bearerトークン、秘密鍵は保存前に `[REDACTED]` へ置換する。
-- JSON、YAML、通常のenv代入として安全に解析できる値は周辺構文を保って伏字化する。未閉じ引用符、複数行引用符、YAML block scalar、ANSI-C引用、command substitution、未引用backslash escape、引用値の連結などの曖昧な秘密形式は、出力予約前に保存を中止する。
-- 曖昧形式以外のI/O失敗では `.incomplete` または部分的な明示出力が残る。自動削除は競合ファイルを誤削除し得るため行わず、内容確認後に利用者が削除する。
-- 入力コードや解析結果に個人情報が含まれる場合は、保存前に対象を確認し、必要に応じて匿名化する。
-- 保存に失敗した場合は、チャットに失敗理由を示し、未保存の本文を必要最小限だけ返す。
-- Quick ModeをMarkdown保存CLIへ渡してはならない。Quick Modeはチャット回答として完結させる。
-- 検証CLIが失敗した状態で完了報告しない。
-
-### 4B. リファクタリング支援
-
-各提案に必ず含める。
-
-- 目的
-- 挙動変更の有無
-- 変更前コード
-- 変更後コード
-- リスク
-- 必要なテスト
-- ロールバック/移行上の注意
-
-### 4C. コードレビュー/QA
-
-レビュー依頼では、指摘を以下で分類する。
-
-- **[Critical]**: マージ不可。セキュリティ脆弱性、データ消失、重大な正確性バグ、契約違反。
-- **[Major]**: 強く修正推奨。実害の可能性が高いバグ、重要なテスト不足、保守性問題。
-- **[Consider]**: 検討価値あり。設計改善、構造改善、代替案。
-- **[Nit]**: 任意修正。スタイル、局所的な命名、フォーマット。
+- **[Critical]**: マージ不可。セキュリティ脆弱性、データ損失、重大な正確性バグ、契約違反。
+- **[Major]**: 強く修正推奨。実害リスクの高いバグ、重要テスト不足、重大な保守性問題。
+- **[Consider]**: 検討価値あり。設計・可読性・構造改善。
+- **[Nit]**: 任意修正。スタイル、軽微な命名、フォーマット。
 - **[FYI]**: 情報提供のみ。アクション不要。
 
-この語彙は一般コードレビュー専用である。Quality Loopの状態語彙や判定語彙を混在させない。
+## 成果物の保存・検証・安全運用
 
-各指摘の形式：
+Full、Review、Documentation、Refactoring では `report.md`、`run_meta.json`、`source_manifest.json` を保存する。保存が必要になった時点で、排他制御・機密伏字化・必須節・失敗時の扱いの正本 [references/interface.md](references/interface.md) を読む。利用先の保存規則と衝突する場合は上位規則を確認し、黙って保存先を変えない。
 
-```markdown
-- 分類:
-- 場所:
-- 根拠:
-- なぜ重要か:
-- 修正案:
-- 実行すべきテスト:
+### 保存契約の補足
+
+- `collect_code_context.py` の `code_context.md` は `Context` 補助成果物であり、通常レポートの必須見出しを持たず、検証CLIの対象外である。
+- 未閉じ引用符、複数行引用符、YAML block scalar、command substitutionなどの曖昧な秘密形式は、出力予約前に保存を中止する。
+- 出力rootは信頼済み非共有ディレクトリとする。同一UIDの別プロセスによる親ディレクトリ差し替えは保護境界外である。
+- 失敗時は `.incomplete` または部分出力を残し、自動削除しない。内容確認後に利用者が削除するか、別のrun IDで再実行する。
+- 保存に失敗した場合は理由と未保存であることを簡潔に報告する。検証に合格するまで完了を報告しない。
+
+```bash
+# コンテキスト収集（必要時）
+python3 .agents/skills/code-understanding-pro/scripts/collect_code_context.py \
+  <path> [<path> ...]
+
+# レポート保存
+python3 .agents/skills/code-understanding-pro/scripts/write_report.py \
+  --mode <full|review|documentation|refactoring> \
+  --target <target_path> \
+  --content-file <path_to_content.md> \
+  --adapter <generic|sql|stats> \
+  --source <source_file>
+
+# レポート検証（PASSするまで完了報告禁止）
+python3 .agents/skills/code-understanding-pro/scripts/validate_report.py \
+  skill_out/code_understanding/<target>/run_<id>/report.md \
+  --adapter <generic|sql|stats> \
+  --complexity <simple|complex>
 ```
 
----
+## 禁止事項
 
-# モード選択
-
-## Quick Mode
-
-短いコード範囲、単一関数、軽い質問で使う。
-
-出力：
-
-1. 一文要約
-2. 主要ロジック
-3. 入力/出力
-4. 主な副作用または注意点
-5. 必要なら次に見るべき点
-
-## Full Mode
-
-深い理解、設計把握、オンボーディング、複雑なコード解析で使う。
-
-出力：
-
-1. Step 0: 文脈把握
-2. Step 1: 概要理解
-3. Step 2: 詳細追跡
-4. Step 3: 深い設計理解
-5. Step 4: 活用
-
-## Review Mode
-
-レビュー、QA、バグ探し、マージ判断で使う。
-
-出力：
-
-1. 挙動の要約
-2. テストの意図と不足
-3. 重要度別の指摘
-4. 修正案
-5. 実行すべきテスト
-6. 残存リスク
-
-## Documentation Mode
-
-DocString、README、Markdown、設計メモ作成で使う。
-
-出力：
-
-1. 対象コードの目的
-2. API/インターフェース説明
-3. 処理フロー
-4. 入出力例
-5. 制約と注意点
-6. 生成ドキュメント本文
-
-## Refactoring Mode
-
-リファクタリング提案、改善方針、変更前後比較で使う。
-
-出力：
-
-1. 現状の構造
-2. 問題点
-3. リファクタリング方針
-4. 変更前/変更後
-5. 挙動変更有無
-6. 必要なテスト
-7. リスクと代替案
-
----
-
-# 特別ルール
-
-## TODO、一時コード、デバッグコード
-
-以下を検出したら指摘する。
-
-- 放置されたTODO
-- 一時ブランチ
-- debug print
-- hard-coded local path
-- ownerや期限のないfeature flag
-- コメントアウトされた古いコード
-- 根拠のないquick fix条件分岐
-
-ただし、単純に削除を求めない。以下のいずれかに分類する。
-
-- 無害
-- 技術的負債
-- リリース阻害
-- セキュリティ/データリスク
-
-## テスト評価
-
-以下を確認する。
-
-- 振る舞いを検証しているか
-- 境界値を含むか
-- null、空、欠測、異常系を含むか
-- 回帰テストがあるか
-- 実装詳細に依存しすぎていないか
-- snapshot testが脆すぎないか
-- property-based testingが有効そうか
-
-## Mermaid使用基準
-
-次の場合は複雑度を `complex` とし、Mermaid図を使う。
-
-- 主要ステップが3つ以上ある
-- 分岐やループがある
-- 複数クラス/モジュールが相互作用する
-- データ変換が理解の中心である
-- 非同期処理やシーケンスが重要である
-
-上記に該当しない単純な対象は `simple` とし、`## 処理フロー` に文章または箇条書きで処理順を記載すればよい。レポートValidatorには、判定した複雑度を `--complexity simple|complex` で渡す。`complex` では閉じたMermaidブロックを必須とし、`simple` ではMermaidまたは非空のテキスト処理フローを受け付ける。
-
-使い分け：
-
-- `flowchart TD`: 処理フロー
-- `sequenceDiagram`: 呼び出し順序、API連携
-- `classDiagram`: クラス構造
-- `stateDiagram-v2`: 状態遷移
-
----
-
-# 禁止事項
-
-- 根拠のない設計意図を断定しない
-- 短いコードを無条件に良いとしない
-- 挙動変更を伴うリファクタリングを明示せず提案しない
-- 副作用を無視しない
-- 不確実性を隠さない
-- ユーザーが明示しない限り、勝手にファイルを書き換えない
-- スライド作成など無関係な文言を混入しない
-- テストだけを唯一の真実として扱わない
-
----
-
-# 追加参照ファイル
-
-このSkillを強化するため、必要に応じて以下を参照する。
-
-- `references/qiita-code-reading-pyramid.md`
-- `references/review-severity-guide.md`
-- `references/refactoring-safety-checklist.md`
-- `references/test-first-caveats.md`
-- `references/interface.md`
-- `assets/output-template-beginner.md`
-- `assets/output-template-quick.md`
-- `assets/output-template-full.md`
-- `assets/output-template-review.md`
-- `assets/output-template-refactoring.md`
-- `assets/mermaid-patterns.md`
-- `assets/docstring-template-python.md`
-- `assets/docstring-template-r.md`
-- `scripts/collect_code_context.py`
-- `scripts/write_report.py`
-- `scripts/validate_report.py`
+- `write_report.py` を介さず直接レポート成果物ディレクトリを作成・上書きすること。
+- ユーザーの明示的承認のないコード変更、外部実行、Gitリモート操作（commit/push）。
+- 根拠のない設計意図の断定や、不確実性の隠蔽。

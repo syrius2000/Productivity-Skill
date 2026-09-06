@@ -54,6 +54,23 @@ def test_parent_only_specialists_explain_their_boundary() -> None:
     assert "親Skillが利用できない場合" in specialist
 
 
+def test_suite_uses_proportional_depth_and_handoff() -> None:
+    pro = (SKILLS / "code-understanding-pro/SKILL.md").read_text(encoding="utf-8")
+    pyramid = (SKILLS / "code-understanding-pyramid/SKILL.md").read_text(encoding="utf-8")
+    specialist = (SKILLS / "stats-sql-comprehension/SKILL.md").read_text(encoding="utf-8")
+
+    assert "Quick` は" in pro
+    assert "主要ステップ数だけ" in pro
+    assert "対象パスと質問" in pro
+    assert "保存が必要になった時点で" in pro
+    assert "<path> [<path> ...]" in pro
+    assert "確認済みの事実" in pyramid
+    assert "該当する行だけを確認する" in specialist
+    assert "無承認では実行しない" in specialist
+    assert "キーの一意性、結合前後の粒度" in specialist
+    assert "因果効果を主張しない" in specialist
+
+
 def test_suite_has_no_legacy_report_filenames() -> None:
     legacy_names = (
         "code_understanding_report.md",

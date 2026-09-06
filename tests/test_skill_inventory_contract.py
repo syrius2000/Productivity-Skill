@@ -21,6 +21,14 @@ def _skill_names() -> set[str]:
     return {path.parent.name for path in SKILLS.glob("*/SKILL.md")}
 
 
+def test_lightweight_qa_replaces_retired_active_skill() -> None:
+    names = _skill_names()
+    assert {"decision-plan-review", "implementation-readiness-review"} <= names
+    assert not (SKILLS / "spec-driven-qa-review").exists()
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "`spec-driven-qa-review`" not in readme
+
+
 def test_readme_lists_exactly_all_skill_directories() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     names = _skill_names()

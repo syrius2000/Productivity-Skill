@@ -17,18 +17,17 @@ This skill is the reusable reasoning framework under `code-understanding-pro`.
 - Return findings to the parent report contract that `code-understanding-pro` owns. Do not assume a filesystem path outside this Skill unless the parent has confirmed the sibling Skill layout.
 - Preserve the five stages, but write them into the parent's common sections.
 - Ask a question only when missing information materially blocks a correct explanation. Otherwise, state the assumption and continue.
+- 親から「対象パスと質問」「確認済みの事実」「未確認点」「子にだけ求める観点」を受け取った場合は、その観点に必要なStageだけを実施し、すでに確認済みの資料を再読しない。
 
 ## 1 Preparation: Contextual Grounding (準備)
 
-Before providing answers, you must anchor yourself:
+親から必要な文脈が渡されていない場合だけ、正確な説明に必要な環境・README・設定を読む。追加調査した場合は、親へ理由を返す。
 
-- **Environment Audit**: Identify language, framework, and project type (React, Go, Python, etc.).
-- **Doc Parsing**: Read `README.md`, `package.json`, or environment configs to understand project goals.
-- **Mindset Setup**: Adopt the mental model required for this specific domain (e.g., "High-performance API" vs "Quick MVP").
-
-完了条件: 対象範囲、目的、実行環境、入力・出力、関連資料、不明点を列挙できる。調査範囲を広げた場合は、その理由も残す。
+完了条件: 親が依頼した理解の不足を、対象範囲、入力・出力、根拠、不明点で補える。調査範囲を広げた場合は、その理由も残す。
 
 ## 2 Overview: Structural Mapping (概要)
+
+親が概要を不足として依頼した場合だけ実施する。
 
 - **Bird's Eye View**: Explain the folder structure and system layering.
 - **Data Flow**: Identify entry points (APIs, CLI triggers) and exit points (DB, external APIs).
@@ -38,6 +37,8 @@ Before providing answers, you must anchor yourself:
 
 ## 3 Detail: Logic Audit (詳細)
 
+親が詳細追跡を不足として依頼した場合だけ実施する。
+
 - **Logic Trace**: Trace the execution path for specific logic blocks.
 - **Variable Role Mapping**: Identify the purpose and scope of key data entities.
 - **Constraint Identification**: Note limitations, dependencies, and external helper interactions.
@@ -46,6 +47,8 @@ Before providing answers, you must anchor yourself:
 
 ## 4 Deep Understanding: Intent, Tests & Boundaries (深い理解)
 
+親が設計・契約・境界を不足として依頼した場合だけ実施する。
+
 - **The "Why"**: Analyze the design intent behind the implementation. Why this pattern? コードや文書で確認できる事実、根拠からの推論、未確認事項を分離し、設計意図を断定しない。
 - **Contract Verification**: When relevant tests exist, review them and compare their behavioral contract with the specifications and implementation. Treat tests as evidence, not the sole source of truth.
 - **Edge Case Analysis**: Evaluate how boundary conditions and errors are handled.
@@ -53,6 +56,8 @@ Before providing answers, you must anchor yourself:
 完了条件: 設計意図の根拠、テストとの契約差分、境界値・異常系、残存リスクを分けて記載できる。テストがない場合も「未確認」として扱い、合格とは推定しない。
 
 ## 5 Utilization: Value Creation (活用)
+
+親が指定した成果物に必要な発見だけを返す。
 
 Transform understanding into output based on the user's need:
 
