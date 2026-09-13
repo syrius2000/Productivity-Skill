@@ -1,7 +1,7 @@
 # Quality LoopのAI支援入口と次工程案内の改善計画
 
 created: 2026-09-13 22:53 (JST)
-update: 2026-09-13 23:01 (JST)
+update: 2026-09-13 23:09 (JST)
 author: Codex (GPT-5)
 
 ## 状態・目的・承認範囲
@@ -111,6 +111,16 @@ Implementerが `submit-plan` または `submit-response` を受けた際も、�
 - case正本のスキーマを大きく変更すること、Owner権限をAIへ移すこと、Reviewerが自動でFindingを確定することは対象外とする。
 - `prepare-case` の保存形式、質問・回答の追記形式、複数回更新時の版管理、Owner確認済みをどのフィールドで表すかは実装中に確定する。保存場所はQA-Loopのリポジトリ内とする。
 - 複数active caseを対象ファイルや目的で自動選択できるかは、誤接続時の影響が大きいため、まずは候補一覧と人の明示選択を基本とする。
+
+## 実装状況（2026-09-13）
+
+- [x] `prepare-case` CLIを追加し、初回依頼からQA-Loopリポジトリ内の下書きファイルを生成できるようにした。
+- [x] 下書きにOwner確認を記録し、`--confirm`で正式`create-case`入力ファイルへ変換できるようにした。case正本はこの操作では作成しない。
+- [x] caseなしエラーに`case_setup_required`と`prepare-case`への人間向け案内を追加した。
+- [x] Reviewer／Implementer／Owner向けの`next_step`（担当、目的、依頼文、必要入力、guardrails）を成功結果へ追加した。
+- [x] 追加fixtureを含む22テスト、構文検査、`git diff --check`を実施し、合格した。
+
+本段階の`prepare-case`は外部LLMを呼び出す機能ではなく、AIまたは人が作成した依頼JSONを受け取り、質問・未確認事項を含む下書きファイルとして保存する契約である。対話UIや自動的な質問送信は未実装であり、実運用で重さを確認する次段階の課題として残す。
 
 ## 実装時の確認コマンドと停止条件
 

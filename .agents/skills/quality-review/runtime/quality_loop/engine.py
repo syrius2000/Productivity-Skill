@@ -12,6 +12,7 @@ from .case_store import CaseStore
 from .errors import QualityLoopError
 from .evidence import validate_evidence
 from .handoff import issue_handoff, terminal_handoff
+from .guidance import next_step
 from .model import RESOLVED_VERIFICATION_RESULTS, validate_findings
 from .observation import compute_file_manifest
 from .transitions import ALLOWED_FIELDS, EXPECTED_ROLE, EXPECTED_STATE
@@ -1797,7 +1798,7 @@ class QualityLoop:
         handoff: dict | None,
         status: str = "ok",
     ) -> dict:
-        return {
+        result = {
             "status": status,
             "case_id": case_id,
             "case_revision": revision,
@@ -1806,3 +1807,5 @@ class QualityLoop:
             "next_action": next_action,
             "handoff": deepcopy(handoff),
         }
+        result["next_step"] = next_step(next_role, next_action, case_id, revision, handoff)
+        return result

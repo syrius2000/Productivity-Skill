@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .engine import QualityLoop
 from .errors import QualityLoopError
+from .prepare import prepare_case
 
 
 class JsonArgumentParser(argparse.ArgumentParser):
@@ -25,6 +26,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     create = subparsers.add_parser("create-case")
     create.add_argument("--input", required=True)
+
+    prepare = subparsers.add_parser(
+        "prepare-case",
+        help="AIと人が確認するcase下書きを作成・更新し、create-case入力へ変換する",
+    )
+    prepare.add_argument("--input", required=True, help="依頼JSONまたは既存の下書きJSON")
+    prepare.add_argument("--output", default="qms-case-drafts/case-draft.json")
+    prepare.add_argument("--confirm", action="store_true", help="Owner確認済み下書きをcreate-case入力へ変換する")
+    prepare.add_argument("--create-input", default=None, help="生成するcreate-case入力JSONの保存先")
 
     standalone = subparsers.add_parser(
         "review-standalone",
@@ -127,6 +137,16 @@ def run(argv: list[str] | None = None) -> int:
         loop = QualityLoop(args.case_root)
         if args.command == "create-case":
             result = loop.create_case(read_payload(args.input))
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
+
+        if args.command == "prepare-case":
+            result = prepare_case(
+                Path(args.input),
+                Path(args.output),
+                confirm=args.confirm,
+                create_input_path=Path(args.create_input) if args.create_input else None,
+            )
             print(json.dumps(result, ensure_ascii=False, indent=2))
             return 0
 

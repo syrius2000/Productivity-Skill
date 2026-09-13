@@ -47,6 +47,18 @@ license: "MIT"
 
 9. 成功JSONの`next_role`、`next_action`、`handoff`をそのまま次工程へ示す。失敗時は`error_code`と`remediation`を示し、正本を迂回編集しない。
 
+## AI支援によるcase準備
+
+case情報がなく、対象や依頼目的が提示されている場合は、最初に`prepare-case`を使う。AIは目的、利用者・環境、失敗時のリスク、要求、受入基準、対象を質問し、QA-Loopリポジトリ内の下書きファイルへ保存する。未回答は未確認として残す。
+
+```text
+<quality-review-skill-dir>/bin/quality-review-cli prepare-case --input request.json --output qms-case-drafts/case-draft.json
+<quality-review-skill-dir>/bin/quality-review-cli prepare-case --input qms-case-drafts/case-draft.json --confirm --create-input qms-case-drafts/create-case-input.json
+<quality-review-skill-dir>/bin/quality-review-cli create-case --input qms-case-drafts/create-case-input.json
+```
+
+下書きは人が確認し、追加質問への回答を反映してからOwnerが`owner_confirmation.confirmed=true`を記録する。`prepare-case --confirm`はcase正本を作成せず、確認済みの`create-case`入力だけを生成する。case作成後は返却された`next_step`の担当・目的・依頼文を次のターンへ渡す。AIはcase ID、revision、handoff、Finding、Evidence、実装許可、Owner裁定を発明しない。
+
 実案件、case-root、現在handoffが提供されていない評価・相談ではCLI成功やhandoffを捏造しない。必要入力と実行すべき次操作だけを示す。
 
 ## case情報がない場合の単発入口

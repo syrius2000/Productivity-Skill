@@ -40,6 +40,8 @@ Findingを改変せず、許可境界内で改善を前進させ、Reviewerが�
 
 9. 成功JSONのReviewer向け`next_role`、`next_action`、`handoff`をそのまま提示する。拒否時は対象を追加変更せず、`error_code`と`remediation`に従う。
 
+成功結果には人間向けの`next_step`も含まれる。`担当`、`目的`、`message_template`、`required_inputs`、`guardrails`を確認し、依頼文を次の担当へ渡す。`submit-plan`ではPlan承認前に変更を開始せず、`submit-response`では対象Finding自身の承認済み範囲と`allowed_targets`だけを扱う。次がOwnerの場合は、Owner裁定前に受入・クローズを確定しない。
+
 実案件、Finding本文、case-root、現在handoffが提供されていない評価・相談では、反証内容、CLI成功、handoffを捏造しない。必要入力と予定するDispositionだけを示す。
 
 ## 回答の品質

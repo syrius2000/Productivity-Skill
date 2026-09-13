@@ -1,5 +1,11 @@
 # Quality Review変更履歴
 
+## 開発中: prepare-case
+
+- `prepare-case`でAI支援のcase下書きをQA-Loopリポジトリ内のファイルへ保存できるようにした。
+- 人の確認後だけ、正式`create-case`へ渡す入力を生成する。下書きだけではcase正本を作成しない。
+- 成功結果に担当、目的、依頼文、必要入力、Role境界を示す`next_step`を追加した。
+
 ## 1.5.0
 
 - `review-standalone`を追加し、明示対象からrevision 1の正式caseとReviewer向けhandoffをbootstrapできるようにした。

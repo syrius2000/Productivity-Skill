@@ -26,6 +26,115 @@ def result_of(completed: subprocess.CompletedProcess[str]) -> dict:
 
 
 class QualityReviewStandaloneCliTest(unittest.TestCase):
+    def test_prepare_case_writes_reviewable_draft_and_confirmed_cli_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            request = root / "request.json"
+            draft = root / "case-draft.json"
+            create_input = root / "create-input.json"
+            request.write_text(
+                json.dumps(
+                    {
+                        "owner": "owner-prepare",
+                        "request": "実装結果の独立QA",
+                        "targets": ["artifact.md"],
+                        "intended_use": {"users": "開発者", "environment": "ローカル"},
+                        "risk_context": {"criticality": "low"},
+                        "requirements": [{"requirement_id": "REQ-001", "text": "対象を確認できる"}],
+                        "acceptance_criteria": ["Evidenceを確認できる"],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            prepared = run_cli(
+                root / "cases",
+                "prepare-case",
+                "--input",
+                str(request),
+                "--output",
+                str(draft),
+            )
+            self.assertEqual(0, prepared.returncode, prepared.stderr)
+            prepared_result = result_of(prepared)
+            self.assertEqual("draft-created", prepared_result["status"])
+            draft_payload = json.loads(draft.read_text(encoding="utf-8"))
+            self.assertFalse(draft_payload["owner_confirmation"]["confirmed"])
+            self.assertEqual("needs-human-review", draft_payload["draft_metadata"]["status"])
+
+            draft_payload["owner_confirmation"] = {
+                "confirmed": True,
+                "confirmed_by": "owner-prepare",
+                "confirmed_at": "2026-09-13T23:30:00Z",
+            }
+            draft.write_text(json.dumps(draft_payload, ensure_ascii=False), encoding="utf-8")
+            confirmed = run_cli(
+                root / "cases",
+                "prepare-case",
+                "--input",
+                str(draft),
+                "--output",
+                str(draft),
+                "--confirm",
+                "--create-input",
+                str(create_input),
+            )
+            self.assertEqual(0, confirmed.returncode, confirmed.stderr)
+            confirmed_result = result_of(confirmed)
+            self.assertEqual("ready-for-create-case", confirmed_result["status"])
+            create_payload = json.loads(create_input.read_text(encoding="utf-8"))
+            self.assertEqual("owner", create_payload["role"])
+            self.assertFalse((root / "cases").exists())
+
+            created = run_cli(root / "cases", "create-case", "--input", str(create_input))
+            self.assertEqual(0, created.returncode, created.stderr)
+            created_result = result_of(created)
+            self.assertEqual("reviewer", created_result["next_role"])
+            self.assertEqual("review", created_result["next_action"])
+            self.assertEqual("Reviewer", created_result["next_step"]["担当"])
+
+    def test_prepare_case_requires_owner_confirmation(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            draft = root / "draft.json"
+            draft.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "prepare-case/1.0",
+                        "draft_metadata": {"draft_id": "draft-001", "revision": 1, "owner": "owner-001"},
+                        "proposed_case": {
+                            "case_id": "case-001",
+                            "owner": "owner-001",
+                            "baseline": {
+                                "purpose": "QA",
+                                "intended_use": {"users": "開発者"},
+                                "risk_context": {"criticality": "low"},
+                                "requirements": [{"requirement_id": "R-1", "text": "確認"}],
+                                "acceptance_criteria": ["確認できる"],
+                                "targets": ["artifact.md"],
+                                "target_revision": "prepare-case-unverified",
+                            },
+                        },
+                        "owner_confirmation": {"confirmed": False},
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            failed = run_cli(root / "cases", "prepare-case", "--input", str(draft), "--confirm")
+            self.assertEqual(2, failed.returncode)
+            self.assertEqual("owner-confirmation-required", result_of(failed)["error_code"])
+            self.assertFalse((root / "cases").exists())
+
+    def test_missing_case_routes_human_to_prepare_case(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            failed = run_cli(Path(temp_dir) / "cases", "review", "--input", "missing-review.json")
+            self.assertEqual(3, failed.returncode)
+            result = result_of(failed)
+            self.assertEqual("no-cases-found", result["error_code"])
+            self.assertTrue(result["case_setup_required"])
+            self.assertIn("prepare-case", result["next_step"]["message_template"])
+
     def test_help_exposes_standalone_entrypoint_and_aliases(self) -> None:
         completed = subprocess.run(
             [str(LAUNCHER), "review-standalone", "--help"],

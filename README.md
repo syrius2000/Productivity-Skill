@@ -135,6 +135,7 @@ npx skills add syrius2000/Productivity-Skill -g
 - **境界**: `review-standalone`は案件を開始してレビュー担当者へ引き渡すbootstrapであり、Finding、品質適合、受入、実装許可、Owner裁定を単独では生成しません。
 - **利用場面 / 起動例**:
   - Quality Loop案件でステータスが `next_role=reviewer` の際に自動起動。
+  - case情報がなく、対象と依頼目的が提示された場合は `prepare-case` で下書きを作成し、人の確認後に `create-case` へ渡す。
   - case情報がない単発QAでは、対象ファイルを `--target` または `--artifact` で指定して `review-standalone` から開始。
 
 #### ✍️ **`quality-response`** (v1.4.0)
@@ -142,6 +143,7 @@ npx skills add syrius2000/Productivity-Skill -g
 - **特徴**: いきなり修正せず事前に計画合意を結ぶ「Plan Before Fix」を強制。自己受入・自己クローズを物理的に禁止し、Owner裁定への境界を遵守します。
 - **利用場面 / 起動例**:
   - Quality Loop案件でステータスが `next_role=implementer` の際に自動起動（`submit-plan`, `submit-response`）。
+  - 結果の `next_step` にある担当、目的、依頼文を次のターンへ渡す。
 
 ---
 

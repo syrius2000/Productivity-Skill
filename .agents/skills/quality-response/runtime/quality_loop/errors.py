@@ -19,7 +19,7 @@ class QualityLoopError(Exception):
         self.remediation = remediation
 
     def as_result(self, case_id: str | None = None) -> dict:
-        return {
+        result = {
             "status": "error",
             "error_code": self.error_code,
             "message": self.message,
@@ -31,3 +31,14 @@ class QualityLoopError(Exception):
             "next_action": None,
             "handoff": None,
         }
+        if self.error_code == "no-cases-found":
+            result["case_setup_required"] = True
+            result["next_step"] = {
+                "status": "case-setup-required",
+                "担当": "OwnerとAI",
+                "目的": "対象、QA目的、利用環境、リスク、要求、受入基準を下書きに整理する",
+                "message_template": "caseがないため、まずprepare-caseで下書きを作成し、ファイルを確認してからcreate-caseへ渡してください。",
+                "required_inputs": ["owner", "request", "targets", "intended_use", "risk_context", "requirements", "acceptance_criteria"],
+                "guardrails": ["下書き確認前にcase正本を作成しない", "AIだけでOwner確認を確定しない"],
+            }
+        return result
