@@ -393,7 +393,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mode", choices=("quick", "full", "review", "documentation", "refactoring"), required=True)
     parser.add_argument("--target", required=True, help="解析対象のファイルまたはディレクトリ")
     parser.add_argument("--content-file", type=Path, required=True, help="保存するMarkdown本文")
-    parser.add_argument("--output-root", type=Path, default=Path("./skill_out/code_understanding"))
+    parser.add_argument("--output-root", type=Path, default=Path("./docs/reports/code-understanding-pro"), help="呼出し元プロジェクト基準のレポート出力先")
     parser.add_argument("--run-id", help="runディレクトリ名に使うID（未指定時はJST時刻）")
     parser.add_argument("--adapter", choices=("generic", "sql", "stats"), default="generic")
     parser.add_argument("--audience", choices=("beginner", "practitioner", "expert"), default="beginner")

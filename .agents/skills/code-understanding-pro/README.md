@@ -1,6 +1,6 @@
 # code-understanding-pro 日本語版
 
-既存コードの理解、レビュー、QA、ドキュメント化、リファクタリング支援を行うAgent Skillです。軽い質問はチャットで返し、深い解析はMarkdownレポートとして保存します。
+既存コードの理解、レビュー、ドキュメント化、リファクタリング支援を行うAgent Skillです。軽い質問はチャットで返し、保存を依頼された深い解析だけをMarkdownレポートとして保存します。
 
 ## 内容
 
@@ -92,14 +92,14 @@ cp -R code-understanding-pro .agents/skills/
 | Documentation | `report.md` とチャット要約 |
 | Refactoring | `report.md` とチャット要約 |
 
-深い解析では `report.md`、`run_meta.json`、`source_manifest.json` を `skill_out/code_understanding/<target>/run_<id>/` に保存します。同一runの再実行では上書きしません。
+保存を依頼された深い解析では `report.md`、`run_meta.json`、`source_manifest.json` を呼出し元プロジェクトの `docs/reports/code-understanding-pro/<target>/run_<id>/` に保存します。同一runの再実行では上書きしません。
 
 ```bash
 python3 scripts/write_report.py \
   --mode full \
   --target src/example.py \
   --content-file /tmp/report.md \
-  --output-root ./skill_out/code_understanding \
+  --output-root ./docs/reports/code-understanding-pro \
   --run-id example \
   --adapter generic \
   --audience beginner \
@@ -110,7 +110,7 @@ python3 scripts/write_report.py \
 
 ```bash
 python3 scripts/validate_report.py \
-  ./skill_out/code_understanding/example/run_example/report.md \
+  ./docs/reports/code-understanding-pro/example/run_example/report.md \
   --adapter generic
 ```
 

@@ -5,7 +5,7 @@
 Quick Mode以外の深い解析では、次のMarkdownファイルを保存し、チャットには要約と保存先を返す。
 
 ```text
-skill_out/code_understanding/<target>/run_<id>/
+docs/reports/code-understanding-pro/<target>/run_<id>/
 ├── report.md
 ├── run_meta.json
 └── source_manifest.json

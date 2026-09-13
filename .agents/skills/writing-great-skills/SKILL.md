@@ -7,6 +7,8 @@ license: "MIT"
 
 A skill exists to wrangle determinism out of a stochastic system. **Predictability** — the agent taking the same _process_ every run, not producing the same output — is the root virtue; every lever below serves it.
 
+保存を依頼された評価・補助報告は、呼出し元プロジェクトの`docs/reports/writing-great-skills/`へ保存する。Skill本体、参照資料、例、manifestは対象Skill内の正本として維持する。
+
 **Bold terms** are defined in [`GLOSSARY.md`](GLOSSARY.md); look them up there for the full meaning.
 
 ## Invocation

@@ -37,3 +37,5 @@ Each round the user answers reshapes the tree: settled decisions push the fronti
 Finding _facts_ is your job, never the user's. When a frontier question needs a fact from the environment (filesystem, tools, etc.), investigate it with the available read-only tools; don't ask the user for anything you could look up yourself. An investigation is an unsettled prerequisite, so only its downstream questions wait; ask the rest of the frontier now. The _decisions_ are the user's: put each to them and wait. Do not silently decide an unresolved Critical or Blocking decision.
 
 The session is done when every Critical and Blocking decision is settled, remaining Assumptions are stated, and the user confirms the shared understanding. Do not act on the result until that confirmation.
+
+依頼された相談結果を保存する場合だけ、呼出し元プロジェクトの`docs/reports/grilling/`へ保存する。実装承認用の計画書は`docs/Artifacts/`に保存する。

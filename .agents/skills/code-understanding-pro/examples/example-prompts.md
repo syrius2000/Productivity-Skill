@@ -19,7 +19,7 @@
 ```text
 この処理を、文脈・概要・詳細・設計意図・活用まで分けて説明して。
 
-深い解析結果は `skill_out/code_understanding/example/run_full_demo/report.md` に保存し、チャットには要点と保存先だけを返して。
+深い解析結果は `docs/reports/code-understanding-pro/example/run_full_demo/report.md` に保存し、チャットには要点と保存先だけを返して。
 ```
 
 ## Review Mode
@@ -31,7 +31,7 @@
 ```text
 バグ、テスト不足、副作用、境界条件の観点でレビューして。
 
-レビュー結果は `skill_out/code_understanding/example/run_review_demo/report.md` に保存し、チャットにはCritical/Majorの要点と保存先だけを返して。
+レビュー結果は `docs/reports/code-understanding-pro/example/run_review_demo/report.md` に保存し、チャットにはCritical/Majorの要点と保存先だけを返して。
 
 ## SQL Mode
 

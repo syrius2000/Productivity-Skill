@@ -15,13 +15,13 @@ interface_version: `2.0`
 ## 成果物
 
 ```text
-skill_out/code_understanding/<target>/run_<id>/
+docs/reports/code-understanding-pro/<target>/run_<id>/
 ├── report.md
 ├── run_meta.json
 └── source_manifest.json
 ```
 
-Quick Modeはチャットのみで完結する。Full、Review、Documentation、Refactoringは上記3ファイルを必須とする。
+Quick Modeはチャットのみで完結する。Full、Review、Documentation、Refactoringで保存を依頼された場合は上記3ファイルを作成する。依頼されていないチャット回答のために出力を作成しない。
 
 最終run名を排他的に予約してから3ファイルを直接書き込む。そのため成功前には部分的なrunが見えることがある。生成中は `.incomplete` を置き、成功時だけ削除する。例外、プロセス強制終了、電源断では `.incomplete` または部分ファイルが残るため、内容確認後に利用者が削除するか、別のrun IDで再実行する。
 
@@ -32,7 +32,7 @@ Quick Modeはチャットのみで完結する。Full、Review、Documentation�
 `collect_code_context.py --output-root` は、解析済みレポートではなく、親Skillを補助するContext成果物を保存する。
 
 ```text
-skill_out/code_understanding/<target>/run_<id>/
+docs/reports/code-understanding-pro/<target>/run_<id>/
 ├── code_context.md
 ├── run_meta.json       # mode: Context
 └── source_manifest.json
@@ -87,7 +87,7 @@ I/O失敗時の自動cleanupは、同名へ差し替えられた競合物を誤�
 
 ```bash
 python3 .agents/skills/code-understanding-pro/scripts/validate_report.py \
-  skill_out/code_understanding/<target>/run_<id>/report.md \
+  docs/reports/code-understanding-pro/<target>/run_<id>/report.md \
   --adapter generic
 ```
 

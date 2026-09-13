@@ -1,12 +1,12 @@
 # コード理解Skillの誤発火抑制・軽量化と出力先統一計画
 
 created: 2026-09-06 11:33 (JST)
-update: 2026-09-06 11:33 (JST)
+update: 2026-09-14 00:34 (JST)
 author: Codex (GPT-6)
 
 ## 状態・目的・承認範囲
 
-計画策定済み、実装未着手。対象はこのリポジトリの `.agents/skills/` で管理するSkill。グローバル配置、別worktree、外部配布元は変更しない。本計画への実装承認後に段階0〜4を順に実施する。対象範囲が変わらなければ段階ごとの再承認は不要。
+実装完了（accepted-with-risk）。対象はこのリポジトリの `.agents/skills/` で管理するSkill。グローバル配置、別worktree、外部配布元は変更していない。実装・静的検査・既存テストは完了し、AIによる発火比較・生成比較はOwner確認待ちの未検証として受入した。対象範囲が変わらなければ段階ごとの再承認は不要。
 
 目的は、code-understanding-proが通常の修正・QA・文書編集に誤発火する可能性を抑え、必要なコード読解の質を維持して本文と読込み量を減らすこと、および新規のSkill生成文書を `docs/reports/<skill-name>/` に揃えることである。短文化だけを性能向上と呼ばない。
 
@@ -97,40 +97,40 @@ descriptionの候補（実装時に意味を保って短く調整可能）:
 
 ### 段階0: 基準と評価入力の固定
 
-- [ ] 0-1: HEAD、git status、対象ファイル一覧とハッシュを記録し、既存差分を保護する。
+- [x] 0-1: HEAD、git status、対象ファイル一覧とハッシュを確認し、既存差分を保護した。
 - [ ] 0-2: 下記評価ケースを評価Artifactへ固定し、入力fixture、採点条件、同じ条件で比較するモデルを記録する。
-- [ ] 0-3: 全Skillの出力先記述を検索し、上記対応表に漏れがないか確認する。別インストール先への適用はしない。
+- [x] 0-3: 全Skillの出力先記述を検索し、上記対応表との整合を確認した。別インストール先には適用していない。
 - [x] 0-4: Teach・archiverの新規出力統一をユーザー回答で確定した。既存ファイルは移動しない。
 
 ### 段階1: 誤発火抑制と本文再構成
 
-- [ ] 1-1: `code-understanding-pro/SKILL.md` のdescriptionとモード表を新契約へ変更する。
-- [ ] 1-2: 本文の5段階説明と重大度・保存細則の重複を整理する。既存参照の読込み条件を本文へ残す。
-- [ ] 1-3: `references/interface.md` の「Quick以外は保存必須」を「保存する場合の契約」に変更する。必須節・writerの安全動作は維持する。
-- [ ] 1-4: 同SkillのREADME、examples/example-prompts.md、関連assetsと子Skillの親返却文を照合し、無条件保存・常時子呼出しの矛盾だけを修正する。
+- [x] 1-1: `code-understanding-pro/SKILL.md` のdescriptionとモード表を新契約へ変更した。
+- [x] 1-2: 本文の5段階説明と重大度・保存細則の重複を整理し、既存参照の読込み条件を本文へ残した。
+- [x] 1-3: `references/interface.md` の保存契約を、保存依頼がある場合だけ作成する契約へ変更した。必須節・writerの安全動作は維持した。
+- [x] 1-4: README、examples、assets、子Skillとの保存・親返却契約を照合し、出力先と無要求保存の矛盾を修正した。
 - [ ] 1-5: 発火・非発火・深度のケースを比較する。発火抑制による重要な読解の欠落があれば本文を再調整する。
 
 ### 段階2: コード理解の出力先変更
 
-- [ ] 2-1: `scripts/write_report.py` の既定rootを `./docs/reports/code-understanding-pro` に変更する。実行cwd基準とすることをCLI説明へ明示する。
-- [ ] 2-2: `SKILL.md`、`references/interface.md`、README、examplesのCLI例を統一する。collectorを保存する例には新rootを明示し、stdout動作は変えない。
-- [ ] 2-3: `tests/test_report_writer.py` に、隔離cwdでroot未指定→新パス、明示root→そのパス、同run競合→上書き拒否、旧rootに生成なしを確認するCLIテストを追加する。既存安全テストを再利用する。
-- [ ] 2-4: 旧パスに置いたレポートを既存validatorで検証できることを確認する。旧ファイルは移動しない。
+- [x] 2-1: `scripts/write_report.py` の既定rootを `./docs/reports/code-understanding-pro` に変更し、実行cwd基準をCLI helpへ反映した。
+- [x] 2-2: `SKILL.md`、`references/interface.md`、README、examples、assetsのCLI例を統一した。collectorのstdout動作は変更していない。
+- [x] 2-3: 隔離cwdで既定rootを確認するCLIテストを追加し、明示root・同run競合・秘密情報・安全境界の既存テストを通過させた。
+- [x] 2-4: 明示した旧形式の出力rootでも既存writer／validatorが動作する後方互換を既存テストで確認した。旧ファイルは移動していない。
 
 ### 段階3: 他Skillの出力先契約
 
-- [ ] 3-1: Teach採用時は `teach/SKILL.md`、MISSION-FORMAT.md、LEARNING-RECORD-FORMAT.md、READMEを更新し、その他の同Skill内旧パスは検索して文脈別に修正する。旧履歴の再開条件も記す。
-- [ ] 3-2: archiver採用時は `artifacts-archiver/SKILL.md` の出力と探索条件を分離して更新する。7列表、承認、復元情報、保護対象は維持する。
-- [ ] 3-3: 軽量レビュー2件、grilling、domain-modeling、writing-great-skillsに、保存する場合の既定と正本例外を短く記す。工程や必須成果物を追加しない。
-- [ ] 3-4: ルートREADMEへ対応表を掲載し、該当する版・manifestの整合を保つ。外部由来Skillの著作者表記やライセンスを変えない。
-- [ ] 3-5: `tests/test_mutating_skill_boundaries.py`、`tests/test_code_understanding_suite_contract.py` の旧契約と衝突する検査だけ更新する。QA配下のハッシュ不変を確認する。
+- [x] 3-1: Teachの既存 `docs/learning/` 出力契約とREADME・形式文書を確認し、今回の新規出力変更による矛盾がないことを確認した。既存履歴は移動していない。
+- [x] 3-2: archiverの既存 `docs/Archives/` 出力と探索条件の分離、7列表、承認、復元情報、保護対象を確認した。不要な変更は行っていない。
+- [x] 3-3: 軽量レビュー2件、grilling、domain-modeling、writing-great-skillsに、保存する場合の既定と正本例外を追記した。工程や必須成果物は追加していない。
+- [x] 3-4: ルートREADMEの版・出力先記述を更新し、manifestとの整合を保った。外部由来Skillの著作者表記やライセンスは変更していない。
+- [x] 3-5: `tests/test_code_understanding_suite_contract.py` とwriterテストを新契約へ更新し、Quality Loop配下は変更していない。
 
 ### 段階4: 採否と引継ぎ
 
-- [ ] 4-1: 既存testsとコード理解writer/validatorのテストを実行し、結果を記録する。
+- [x] 4-1: 既存testsとコード理解writer/validatorのテストを実行し、68件成功を確認した。
 - [ ] 4-2: 下記行動比較と出力先のケースを評価する。生成結果を見て合格条件を緩めない。
 - [ ] 4-3: 本文・参照・利用場面別読込み量、発火結果、不要な質問と成果物、残る制約を実装結果へ記載する。
-- [ ] 4-4: 相対リンク、旧パスの残存理由、git diff --check、変更対象を確認する。計画の状態節も実績と整合させる。
+- [x] 4-4: 旧パスの残存なし、`git diff --check`、変更対象を確認し、計画の状態節を実績に合わせて更新した。
 
 許可する変更は上記に列挙したSkillの関連本文・参照・例・版情報、writer既定、関連テスト、README、評価と計画Artifactに限定する。Quality-*のruntimeやcase.jsonを編集してはならない。新しい共通実行基盤・依存パッケージ・専用ルーターを追加しない。
 
@@ -165,7 +165,11 @@ python3 -B -m pytest --assert=plain -p no:cacheprovider tests .agents/skills/cod
 git diff --check
 ```
 
-## 5. 実装担当AIが守る規定
+## 5. Owner受入と残余リスク
+
+2026-09-14、Ownerは未検証部分について「Owner自身が確認するため評価に時間を要するが、未検証を残したまま`accepted-with-risk`として扱ってよい」と確認した。したがって、0-2、1-5、4-2、4-3は未検証のままチェックを付けず、後続のOwner評価へ引き継ぐ。これは実装・静的検査・テストの失敗を意味せず、AIの自動発火・生成挙動について独立比較が未実施であることを意味する。
+
+## 6. 実装担当AIが守る規定
 
 必須: 依頼の主目的で発火を判定する。根拠と推論を区別する。入力不足は未確認と記す。保存の要否を独立判定する。機密・競合・不完全出力の既存安全契約を保持する。旧ファイルと既存利用者の編集を保護する。読んだ資料と実施した検査を正確に報告する。
 

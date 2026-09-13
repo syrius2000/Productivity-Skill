@@ -14,12 +14,13 @@ WRITER = SKILL_DIR / "scripts" / "write_report.py"
 COLLECTOR = SKILL_DIR / "scripts" / "collect_code_context.py"
 
 
-def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
+def run_cli(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(args[0]), *args[1:]],
         text=True,
         capture_output=True,
         check=False,
+        cwd=cwd,
     )
 
 
@@ -81,6 +82,27 @@ flowchart TD
     assert sources["sources"][0]["path"] == str(content_path)
     assert sources["sources"][0]["exists"] is True
     assert len(sources["sources"][0]["sha256"]) == 64
+
+
+def test_write_report_default_root_is_docs_reports(tmp_path: Path) -> None:
+    content_path = tmp_path / "content.md"
+    content_path.write_text("# default\n", encoding="utf-8")
+    result = run_cli(
+        WRITER,
+        "--mode",
+        "full",
+        "--target",
+        "src/source.py",
+        "--content-file",
+        str(content_path),
+        "--run-id",
+        "default-root",
+        cwd=tmp_path,
+    )
+    assert result.returncode == 0, result.stderr
+    expected = tmp_path / "docs/reports/code-understanding-pro/source/run_default-root/report.md"
+    assert expected.read_text(encoding="utf-8") == "# default\n"
+    assert not (tmp_path / "skill_out").exists()
 
 
 def test_write_report_rejects_existing_run_without_overwriting(tmp_path: Path) -> None:

@@ -86,3 +86,5 @@ Only offer an ADR when all three are true:
 If all three are true, propose the ADR path, number, title, and decision summary. Create it only after explicit user approval. If any condition is missing, skip the ADR. Use the format in [ADR-FORMAT.md](./ADR-FORMAT.md).
 
 名称変更だけ、または未決定の移行方式だけではADRを作らない。移行方式が用語の意味・データ境界・トレードオフに影響する場合は、決定済みの事実と未確認事項を分けて質問または調査計画を示す。
+
+補助報告の保存を依頼された場合だけ、呼出し元プロジェクトの`docs/reports/domain-modeling/`へ保存する。CONTEXT.md、CONTEXT-MAP.md、`docs/adr/`はドメイン正本として維持する。

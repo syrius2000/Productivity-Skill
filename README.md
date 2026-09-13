@@ -24,7 +24,7 @@ AI コーディングエージェント（Antigravity, Cursor, Claude Code, Code
 ├── .agents/
 │   └── skills/                  # エージェントスキル格納フォルダ (12 Skills)
 │       ├── artifacts-archiver/       # ドキュメント自動アーカイブ
-│       ├── code-understanding-pro/   # コード理解・親ルーター (v2.3.0-ja)
+│       ├── code-understanding-pro/   # コード理解・親ルーター (v2.4.0-ja)
 │       ├── code-understanding-pyramid/# 5段階理解ピラミッド (v3.0.0)
 │       ├── domain-modeling/          # ドメイン用語集・ADR管理
 │       ├── grilling/                 # 思考・設計ストレステスト面接
@@ -89,11 +89,11 @@ npx skills add syrius2000/Productivity-Skill -g
 
 | Skill | 現行バージョン | 役割 |
 | :--- | :---: | :--- |
-| [`code-understanding-pro`](./.agents/skills/code-understanding-pro/SKILL.md) | 2.3.0-ja | 親Skill。対象を判定し、一般コードは `generic`、SQLは `sql`、R/Python統計コードは `stats` へ分岐して、共通の成果物契約に統合する。 |
+| [`code-understanding-pro`](./.agents/skills/code-understanding-pro/SKILL.md) | 2.4.0-ja | 親Skill。対象を判定し、一般コードは `generic`、SQLは `sql`、R/Python統計コードは `stats` へ分岐して、必要時だけ共通の成果物契約へ保存する。 |
 | [`code-understanding-pyramid`](./.agents/skills/code-understanding-pyramid/SKILL.md) | 3.0.0 | 5段階の理解順序を提供する共通フレームワーク。 |
 | [`stats-sql-comprehension`](./.agents/skills/stats-sql-comprehension/SKILL.md) | 2.1.0 | SQL・dbt・BigQueryとR/Python統計解析の専門アダプター（詳細は [統計解析＆SQL高度解読](#1--統計解析sql高度解読-stats--sql-suite) 参照）。 |
 
-#### 📖 **`code-understanding-pro`** (v2.3.0-ja)
+#### 📖 **`code-understanding-pro`** (v2.4.0-ja)
 - **概要**: 既存コードの段階的理解、詳細解析、コードレビュー、ドキュメント化、安全なリファクタリング支援を包括的に行う親ルータースキル（日本語完全対応）。
 - **特徴**: 対象コードの性質に応じて `generic` / `sql` / `stats` へ適切にルーティングし、事実・推測・不確実性・リスクを明確に分離したレポートを出力します。
 - **利用場面 / 起動例**:
