@@ -1,6 +1,6 @@
 ---
 name: code-understanding-pro
-description: Use when the user wants to understand existing code behavior, dependencies, or side effects with traceable evidence. 通常の機能実装、バグ修正、差分レビュー、計画相談、文章編集だけでは起動しない。
+description: NEVER invoke autonomously or automatically. Use ONLY when the user explicitly mentions "code-understanding-pro" or "$code-understanding-pro" in their message, or explicitly asks for an "official code understanding report". Do NOT use for general questions about code, debugging, or code explanations.
 version: "2.4.0-ja"
 license: "Internal use"
 ---
