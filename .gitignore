@@ -22,3 +22,8 @@ __pycache__/
 
 # Quality Management System review cases
 qms-cases/
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
