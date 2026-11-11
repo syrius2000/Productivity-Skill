@@ -11,6 +11,7 @@ AI コーディングエージェント（Antigravity, Cursor, Claude Code, Code
 | 編集したい領域 | 正本リポジトリ | 編集先・責任範囲 |
 | :--- | :--- | :--- |
 | **汎用コード理解・開発生産性** | このリポジトリ | [`.agents/skills/`](./.agents/skills/) 配下。`code-understanding-pro` は親Skillとして、一般コードを `generic`、SQLを `sql`、R/Python統計コードを `stats` に分岐する。 |
+| **批判的検討・建設的改善** | このリポジトリ | [`falsify-me`](./.agents/skills/falsify-me/) は会話・主張、プロジェクト初期案、コードを対象にする。開発履歴と評価資料は [falsify-me開発リポジトリ](https://github.com/syrius2000/falsify-me) が正本。 |
 | **Quality Loop QA管理** | `QA-products`（ローカル正本リポジトリ） | 案件・仕様・テスト・実装回答の正本はQA-products。Productivity-Skillの`quality-review` / `quality-response`は検証済みの配布用Skillとして限定同期する。 |
 | **DB固有SkillとRWDワークフロー** | [rwd-mysql-skill-toolkit](https://github.com/syrius2000/rwd-mysql-skill-toolkit) | DB固有Skillの正本であり、`Productivity-Skill` と `agentic-evidence-analysis` を利用する「RWDデータワークフローの実行・統合ハブ」。 |
 | **VCD・統計的エビデンス分析** | [agentic-evidence-analysis](https://github.com/syrius2000/agentic-evidence-analysis) | VCD・統計的エビデンス分析Skillの正本。 |
@@ -22,7 +23,7 @@ AI コーディングエージェント（Antigravity, Cursor, Claude Code, Code
 ```text
 .
 ├── .agents/
-│   └── skills/                  # エージェントスキル格納フォルダ (12 Skills)
+│   └── skills/                  # エージェントスキル格納フォルダ (14 Skills)
 │       ├── artifacts-archiver/       # ドキュメント自動アーカイブ
 │       ├── code-understanding-pro/   # コード理解・親ルーター (v2.4.0-ja)
 │       ├── code-understanding-pyramid/# 5段階理解ピラミッド (v3.0.0)
@@ -34,7 +35,8 @@ AI コーディングエージェント（Antigravity, Cursor, Claude Code, Code
 │       ├── implementation-readiness-review/ # 実装着手前レビュー
 │       ├── stats-sql-comprehension/  # 統計＆SQL高度解読 (v2.1.0)
 │       ├── teach/                    # 対話型教育ポータル構築
-│       └── writing-great-skills/     # スキル設計・作成メタガイド
+│       ├── writing-great-skills/     # スキル設計・作成メタガイド
+│       └── falsify-me/               # 批判的検討から建設的改善へ
 ├── docs/
 │   ├── Archives/                # 過去サマリー文書・ZIPアーカイブ
 │   └── Artifacts/               # アクティブ作業用計画・報告書
@@ -69,7 +71,7 @@ npx skills add syrius2000/Productivity-Skill -g
 
 ---
 
-## 🛠️ 収録スキル一覧 (12 Skills)
+## 🛠️ 収録スキル一覧 (14 Skills)
 
 ### 1. 📊 統計解析＆SQL高度解読 (Stats & SQL Suite)
 
@@ -124,9 +126,21 @@ npx skills add syrius2000/Productivity-Skill -g
   - 「この計画で実装開始してよいか、手戻り要因を見て」
   - 「受入基準とテスト方針が明確になっているか確認して」
 
+### 4. 🧭 批判的検討から建設的改善へ (Falsify Me)
+
+#### **`falsify-me`**
+- **概要**: 会話・主張、プロジェクト初期案、コードについて、結論や意思決定に影響する反証を探し、根拠に沿った最小の改稿・実験・修正へつなげます。
+- **特徴**: `SURVIVES` / `REVISE` / `FAILS` / `INCONCLUSIVE` を主張ごとに使い、観測・導出・仮説を区別します。重大リスクではICH Q9(R1)を基盤に、影響、既存管理策、残余リスク、受容判断を扱います。
+- **適用範囲**: 明示的に批判的検討、反証、ストレステストを求める依頼が対象です。通常の説明、校正、デバッグ、一般レビューには自動適用しません。
+- **利用場面 / 起動例**:
+  - 「この主張を批判的に検討して改善して」
+  - 「このPJ案の破綻条件と最小実験を示して」
+  - 「このコードを批判的に検討し、最小修正案を示して」
+- [使い方と評価上の限界](./.agents/skills/falsify-me/README.md)
+
 ---
 
-### 4. 🛡️ 厳格QMS型QA＆品質ループ (Quality Loop Suite)
+### 5. 🛡️ 厳格QMS型QA＆品質ループ (Quality Loop Suite)
 
 #### 🔍 **`quality-review`** (v1.5.0)
 - **概要**: Quality Loop案件において独立レビュアー（Reviewer）として動作し、専用CLI経由で安全に品質検証を行うスキル。
@@ -147,7 +161,7 @@ npx skills add syrius2000/Productivity-Skill -g
 
 ---
 
-### 5. 🌶️ 思考整理・設計のストレステスト (Grilling)
+### 6. 🌶️ 思考整理・設計のストレステスト (Grilling)
 
 #### 🔥 **`grilling`**
 - **概要**: プラン、意思決定、設計アイデアに対し、AIが「デザインツリー（決定境界のフロンティア）」をラウンド形式で徹底的に面接・質問する思考検証スキル。
@@ -157,7 +171,7 @@ npx skills add syrius2000/Productivity-Skill -g
 
 ---
 
-### 6. 🏗️ ドメインモデリング・ユビキタス言語管理
+### 7. 🏗️ ドメインモデリング・ユビキタス言語管理
 
 #### 📘 **`domain-modeling`**
 - **概要**: チームやプロジェクト固有の用語集（`CONTEXT.md`）およびドメイン構造モデルをアクティブに構築・保守するスキル。
@@ -167,7 +181,7 @@ npx skills add syrius2000/Productivity-Skill -g
 
 ---
 
-### 7. 👨‍🏫 学習・教育支援
+### 8. 👨‍🏫 学習・教育支援
 
 #### 📚 **`teach`**
 - **概要**: 一方的な解説ではなく、対話形式で段階的に技術やコードの仕組みを教え、`./docs/learning/` 配下にポータル（`INDEX.html`）や教材・学習記録を体系的に構築する教育スキル。
@@ -177,7 +191,7 @@ npx skills add syrius2000/Productivity-Skill -g
 
 ---
 
-### 8. 🖋️ スキル開発・設計メタガイド
+### 9. 🖋️ スキル開発・設計メタガイド
 
 #### 🛠️ **`writing-great-skills`**
 - **概要**: エージェント用の新しいスキルを作成・修正する際、予測可能性（Predictability）、牽引語（Leading Words）、情報階層・段階的開示（Progressive Disclosure）、No-op枝刈り等を用いて高品質に仕上げるためのメタスキル。
@@ -187,7 +201,7 @@ npx skills add syrius2000/Productivity-Skill -g
 
 ---
 
-### 9. 🗃️ ドキュメント管理・自動アーカイブ
+### 10. 🗃️ ドキュメント管理・自動アーカイブ
 
 #### 📦 **`artifacts-archiver`**
 - **概要**: `./docs/Artifacts/` 内の完了済み計画書や報告書を精査し、対象期間を明記したまとめ文書へ集約して `./docs/Archives/` へ退避するスキル。
@@ -202,5 +216,5 @@ npx skills add syrius2000/Productivity-Skill -g
 本リポジトリは、原則として [MIT License](./LICENSE) のもとで公開されています。
 
 各スキル個別の利用条件については、各スキルの `SKILL.md`（front matter の `license` 項目）または同梱のライセンス文書をご確認ください。
-- **汎用・教育・作業支援スキル（11件）**: `MIT`
+- **汎用・教育・作業支援スキル（13件）**: `MIT`
 - **`code-understanding-pro`**: `Internal use`（個人利用・社内検討向け。詳細は同梱の [`LICENSE.txt`](./.agents/skills/code-understanding-pro/LICENSE.txt) を参照）

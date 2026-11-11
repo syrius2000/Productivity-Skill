@@ -1,0 +1,5 @@
+interface:
+  display_name: "Falsify Me"
+  short_description: "Challenge claims and turn evidence into improvements"
+policy:
+  allow_implicit_invocation: true
